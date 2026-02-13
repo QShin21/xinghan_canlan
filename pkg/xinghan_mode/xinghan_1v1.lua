@@ -243,13 +243,13 @@ local xinghan_1v1_getLogic = function()
     room:setBanner("@xinghan_round", "第 1 局")
     room:setBanner("@xinghan_won", "获胜武将 0 : 0")
     
-    -- 选择首发武将
+    -- 选择首发武将（可选1-2名）
     room:doBroadcastNotify("ShowToast", Fk:translate("xinghan choose debut"))
     
     local req = Request:new(room.players, "AskForGeneral")
     req.timeout = room:getSettings('generalTimeout')
-    req:setData(first, { first_pool, 1 })
-    req:setData(second, { second_pool, 1 })
+    req:setData(first, { first_pool, 2 })  -- 可选1-2名
+    req:setData(second, { second_pool, 2 })
     req:setDefaultReply(first, { first_pool[1] })
     req:setDefaultReply(second, { second_pool[1] })
     req:ask()
@@ -257,10 +257,19 @@ local xinghan_1v1_getLogic = function()
     -- 设置玩家武将
     for _, p in ipairs(room.players) do
       local pool = (p == first) and first_pool or second_pool
-      local chosen_general = req:getResult(p)[1]
+      local chosen_generals = req:getResult(p)
       
-      room:setPlayerGeneral(p, chosen_general, true, true)
-      removeGeneral(pool, chosen_general)
+      if #chosen_generals == 1 then
+        -- 单将
+        room:setPlayerGeneral(p, chosen_generals[1], true, true)
+        removeGeneral(pool, chosen_generals[1])
+      else
+        -- 双将
+        room:setPlayerGeneral(p, chosen_generals[1], true, true)
+        room:setPlayerProperty(p, "deputyGeneral", chosen_generals[2])
+        removeGeneral(pool, chosen_generals[1])
+        removeGeneral(pool, chosen_generals[2])
+      end
       
       if p == first then
         room:setBanner("@&xinghan_first_pool", pool)
@@ -309,11 +318,12 @@ Fk:loadTranslationTable{
   ["#xinghan-ban"] = "你是[%arg]，请禁用 %arg2 名武将",
   ["#xinghan-choose"] = "你是[%arg]，请选择 %arg2 名武将",
   
-  ["xinghan choose debut"] = "请选择首发武将",
+  ["xinghan choose debut"] = "请选择首发武将（可选1-2名）",
   
   ["@xinghan_score"] = "比分",
   ["@xinghan_round"] = "局数",
   ["@xinghan_won"] = "获胜武将数",
+  ["@xinghan_round_wins"] = "小局胜利数",
   ["@&xinghan_first_pool"] = "先手武将池",
   ["@&xinghan_second_pool"] = "后手武将池",
   ["@&xinghan_first_locked"] = "先手已锁定",
@@ -321,6 +331,7 @@ Fk:loadTranslationTable{
   
   ["#XinghanScore"] = "比分 先手 %arg : %arg2 后手",
   ["#XinghanWonCount"] = "获胜武将 先手 %arg : %arg2 后手",
+  ["#XinghanRoundWins"] = "小局胜利 先手 %arg : %arg2 后手",
   ["#XinghanRoundWin"] = "%arg 赢得本局胜利！当前比分 %arg2",
 }
 

@@ -10,12 +10,13 @@ local U = require "packages.xinghan_canlan.pkg.xinghan_mode.xinghan_util"
 
 -- 游戏状态存储
 local game_state = {
-  round_count = 1,
-  first_wins = 0,
-  second_wins = 0,
-  first_won_count = 0,
-  second_won_count = 0,
-  current_first = true,
+  round_count = 1,           -- 当前局数
+  first_wins = 0,            -- 先手胜局数
+  second_wins = 0,           -- 后手胜局数
+  first_won_count = 0,       -- 先手累计获胜武将数
+  second_won_count = 0,      -- 后手累计获胜武将数
+  first_round_wins = 0,      -- 先手累计小局胜利数
+  second_round_wins = 0,     -- 后手累计小局胜利数
   shuffle_count = 0,
   peach_as_wine = false,
   hp_damage_active = false,
@@ -155,14 +156,22 @@ rule:addEffect(fk.GameOverJudge, {
     if player.rest > 0 then return end
     
     -- 判断胜负
-    local winner = player.next
-    local loser = player
+    local winner = player.next  -- 存活的一方
+    local loser = player        -- 死亡的一方
     
-    -- 更新获胜武将数
+    -- 计算胜方派出的武将数量（主将 + 副将）
+    local winner_general_count = 1
+    if winner.deputyGeneral and winner.deputyGeneral ~= "" then
+      winner_general_count = 2
+    end
+    
+    -- 更新获胜武将数（根据胜方派出的武将数量）
     if isFirstPlayer(winner) then
-      game_state.first_won_count = game_state.first_won_count + 1
+      game_state.first_won_count = game_state.first_won_count + winner_general_count
+      game_state.first_round_wins = game_state.first_round_wins + 1
     else
-      game_state.second_won_count = game_state.second_won_count + 1
+      game_state.second_won_count = game_state.second_won_count + winner_general_count
+      game_state.second_round_wins = game_state.second_round_wins + 1
     end
     
     -- 锁定胜方武将
@@ -174,6 +183,8 @@ rule:addEffect(fk.GameOverJudge, {
     -- 更新显示
     room:setBanner("@xinghan_won", string.format("获胜武将 %d : %d", 
       game_state.first_won_count, game_state.second_won_count))
+    room:setBanner("@xinghan_round_wins", string.format("小局胜利 %d : %d",
+      game_state.first_round_wins, game_state.second_round_wins))
     
     room:sendLog{
       type = "#XinghanWonCount",
@@ -182,8 +193,19 @@ rule:addEffect(fk.GameOverJudge, {
       toast = true,
     }
     
-    -- 判断是否赢得本局（累计5名武将获胜）
-    if game_state.first_won_count >= 5 then
+    room:sendLog{
+      type = "#XinghanRoundWins",
+      arg = game_state.first_round_wins,
+      arg2 = game_state.second_round_wins,
+      toast = true,
+    }
+    
+    -- 判断是否赢得本局
+    -- 条件：累计小局胜利数 = 3 且 累计获胜武将数 = 5
+    local first_can_win = game_state.first_round_wins == 3 and game_state.first_won_count == 5
+    local second_can_win = game_state.second_round_wins == 3 and game_state.second_won_count == 5
+    
+    if first_can_win then
       game_state.first_wins = game_state.first_wins + 1
       room:sendLog{
         type = "#XinghanRoundWin",
@@ -192,19 +214,23 @@ rule:addEffect(fk.GameOverJudge, {
         toast = true,
       }
       
+      -- 判断是否赢得比赛（五局三胜）
       if game_state.first_wins >= 3 then
         room:gameOver("lord")
         return
       end
       
+      -- 重置本局状态，开始新一局
       game_state.round_count = game_state.round_count + 1
       game_state.first_won_count = 0
       game_state.second_won_count = 0
+      game_state.first_round_wins = 0
+      game_state.second_round_wins = 0
       game_state.shuffle_count = 0
       game_state.peach_as_wine = false
       game_state.hp_damage_active = false
       
-    elseif game_state.second_won_count >= 5 then
+    elseif second_can_win then
       game_state.second_wins = game_state.second_wins + 1
       room:sendLog{
         type = "#XinghanRoundWin",
@@ -218,9 +244,12 @@ rule:addEffect(fk.GameOverJudge, {
         return
       end
       
+      -- 重置本局状态
       game_state.round_count = game_state.round_count + 1
       game_state.first_won_count = 0
       game_state.second_won_count = 0
+      game_state.first_round_wins = 0
+      game_state.second_round_wins = 0
       game_state.shuffle_count = 0
       game_state.peach_as_wine = false
       game_state.hp_damage_active = false
@@ -277,15 +306,20 @@ rule:addEffect(fk.BuryVictim, {
     end
     
     last_event:addCleaner(function()
-      -- 选择新武将上场（只选1个）
+      -- 选择新武将上场（可选1-2名）
+      local max_choose = math.min(2, #available)
       local req = Request:new({player}, "AskForGeneral")
       req.timeout = room:getSettings('generalTimeout')
-      req:setData(player, { available, 1 })
+      req:setData(player, { available, max_choose })
       req:setDefaultReply(player, { available[1] })
       req:ask()
       
-      local g = req:getResult(player)[1]
-      removeGeneral(pool, g)
+      local chosen = req:getResult(player)
+      
+      -- 移除已选武将
+      for _, g in ipairs(chosen) do
+        removeGeneral(pool, g)
+      end
       
       -- 更新武将池
       if isFirstPlayer(player) then
@@ -303,11 +337,25 @@ rule:addEffect(fk.BuryVictim, {
         Player.TreasureSlot,
         Player.JudgeSlot,
       })
-      room:changeHero(player, g, false, false, true)
       
-      room:setPlayerProperty(player, "shield", Fk.generals[g].shield)
+      -- 设置新武将
+      if #chosen == 1 then
+        room:changeHero(player, chosen[1], false, false, true)
+      else
+        -- 双将
+        room:changeHero(player, chosen[1], false, false, true, chosen[2])
+      end
+      
+      -- 复活并设置体力
+      room:setPlayerProperty(player, "shield", Fk.generals[chosen[1]].shield)
       room:revivePlayer(player, false)
-      room:setPlayerProperty(player, "hp", Fk.generals[g].hp)
+      
+      -- 双将体力计算
+      local hp = Fk.generals[chosen[1]].hp
+      if #chosen > 1 then
+        hp = math.floor((hp + Fk.generals[chosen[2]].hp) / 2)
+      end
+      room:setPlayerProperty(player, "hp", hp)
       
       local draw_data = DrawInitialData:new{ num = 4 }
       room.logic:trigger(fk.DrawInitialCards, player, draw_data)
@@ -344,18 +392,6 @@ rule:addEffect(fk.AfterDrawPileShuffle, {
     if game_state.shuffle_count >= 3 then
       game_state.hp_damage_active = true
     end
-  end,
-})
-
--- 鏖战：禁止桃作为回复牌使用
-rule:addEffect("prohibit", {
-  is_prohibited = function(self, from, to, card)
-    if game_state.peach_as_wine and card.name == "peach" then
-      -- 禁止桃作为回复牌使用（对目标使用）
-      -- 但允许桃作为酒使用（对自己使用增加伤害）
-      return false  -- 暂时允许，后续处理
-    end
-    return false
   end,
 })
 
@@ -409,6 +445,7 @@ Fk:loadTranslationTable{
   ["#XinghanShuffle"] = "牌堆已洗牌 %arg 次",
   ["#XinghanPeachAsWine"] = "鏖战开始：【桃】视为【酒】",
   ["#XinghanAoZhanDamage"] = "鏖战：回合结束，%arg 失去1点体力",
+  ["#XinghanRoundWins"] = "小局胜利 先手 %arg : %arg2 后手",
   
   ["xinghan_aozhan"] = "鏖战",
 }
