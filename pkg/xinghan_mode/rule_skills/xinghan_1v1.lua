@@ -23,6 +23,7 @@ local game_state = {
 
 -- 从武将池中移除武将
 local function removeGeneral(generals, g)
+  if not generals or #generals == 0 then return nil end
   local gt = Fk.generals[g].trueName
   for i, v in ipairs(generals) do
     if Fk.generals[v].trueName == gt then
@@ -71,6 +72,44 @@ local function addLockedGeneral(player, general)
   end
 end
 
+-- 摸初始手牌函数
+local function drawInit(room, player, n)
+  if n <= 0 then return {} end
+  local cardIds = {}
+  for _ = 1, n do
+    if #room.draw_pile > 0 then
+      local id = room.draw_pile[1]
+      table.insert(cardIds, id)
+      table.remove(room.draw_pile, 1)
+    end
+  end
+  
+  if #cardIds == 0 then return {} end
+  
+  player:addCards(Player.Hand, cardIds)
+  for _, id in ipairs(cardIds) do
+    Fk:filterCard(id, player)
+  end
+
+  local move_to_notify = {
+    moveInfo = {},
+    to = player,
+    toArea = Card.PlayerHand,
+    moveReason = fk.ReasonDraw
+  }
+  for _, id in ipairs(cardIds) do
+    table.insert(move_to_notify.moveInfo,
+    { cardId = id, fromArea = room:getCardArea(id) })
+  end
+  room:notifyMoveCards(nil, {move_to_notify})
+
+  for _, id in ipairs(cardIds) do
+    room:setCardArea(id, Card.PlayerHand, player.id)
+  end
+  room:syncDrawPile()
+  return cardIds
+end
+
 -- 登场效果
 rule:addEffect(fk.GameStart, {
   can_refresh = function(self, event, target, player, data)
@@ -78,7 +117,6 @@ rule:addEffect(fk.GameStart, {
   end,
   on_refresh = function(self, event, target, player, data)
     local room = player.room
-    -- 触发登场事件
     room.logic:trigger(U.Debut, player, player.general, false)
     room.logic:trigger(U.Debut, player.next, player.next.general, false)
   end,
@@ -90,7 +128,7 @@ rule:addEffect(fk.DrawInitialCards, {
     return target == player
   end,
   on_refresh = function(self, event, target, player, data)
-    data.num = 4  -- 固定4张起始手牌
+    data.num = 4
   end,
 })
 
@@ -114,9 +152,11 @@ rule:addEffect(fk.GameOverJudge, {
     local room = player.room
     room:setTag("SkipGameRule", true)
     
+    if player.rest > 0 then return end
+    
     -- 判断胜负
-    local winner = player.next  -- 存活的一方
-    local loser = player        -- 死亡的一方
+    local winner = player.next
+    local loser = player
     
     -- 更新获胜武将数
     if isFirstPlayer(winner) then
@@ -152,13 +192,11 @@ rule:addEffect(fk.GameOverJudge, {
         toast = true,
       }
       
-      -- 判断是否赢得比赛（五局三胜）
       if game_state.first_wins >= 3 then
-        room:gameOver("lord")  -- 先手获胜
+        room:gameOver("lord")
         return
       end
       
-      -- 重置本局状态，开始新一局
       game_state.round_count = game_state.round_count + 1
       game_state.first_won_count = 0
       game_state.second_won_count = 0
@@ -176,11 +214,10 @@ rule:addEffect(fk.GameOverJudge, {
       }
       
       if game_state.second_wins >= 3 then
-        room:gameOver("renegade")  -- 后手获胜
+        room:gameOver("renegade")
         return
       end
       
-      -- 重置本局状态
       game_state.round_count = game_state.round_count + 1
       game_state.first_won_count = 0
       game_state.second_won_count = 0
@@ -189,7 +226,6 @@ rule:addEffect(fk.GameOverJudge, {
       game_state.hp_damage_active = false
     end
     
-    -- 更新局数显示
     room:setBanner("@xinghan_round", string.format("第 %d 局", game_state.round_count))
     room:setBanner("@xinghan_score", string.format("%d : %d", 
       game_state.first_wins, game_state.second_wins))
@@ -205,7 +241,8 @@ rule:addEffect(fk.BuryVictim, {
     local room = player.room
     room:setTag("SkipGameRule", true)
     
-    -- 获取武将池
+    if player.rest > 0 then return end
+    
     local pool = getGeneralPool(player)
     local locked = getLockedGenerals(player)
     
@@ -220,19 +257,15 @@ rule:addEffect(fk.BuryVictim, {
     player:bury()
     
     if #available == 0 then
-      -- 没有可用武将，游戏结束
       room:gameOver(player.next.role)
       return
     end
     
-    -- 处理回合结束后的换将
     local current = room.logic:getCurrentEvent()
     local last_event = nil
-    
     if room.current.dead then
       last_event = current:findParent(GameEvent.Turn, true)
     end
-    
     if last_event == nil then
       last_event = current
       if last_event.parent then
@@ -244,19 +277,15 @@ rule:addEffect(fk.BuryVictim, {
     end
     
     last_event:addCleaner(function()
-      -- 选择新武将上场
+      -- 选择新武将上场（只选1个）
       local req = Request:new({player}, "AskForGeneral")
       req.timeout = room:getSettings('generalTimeout')
-      req:setData(player, { available, 2 })  -- 可选1-2名
+      req:setData(player, { available, 1 })
       req:setDefaultReply(player, { available[1] })
       req:ask()
       
-      local chosen = req:getResult(player)
-      
-      -- 移除已选武将
-      for _, g in ipairs(chosen) do
-        removeGeneral(pool, g)
-      end
+      local g = req:getResult(player)[1]
+      removeGeneral(pool, g)
       
       -- 更新武将池
       if isFirstPlayer(player) then
@@ -265,10 +294,7 @@ rule:addEffect(fk.BuryVictim, {
         room:setBanner("@&xinghan_second_pool", pool)
       end
       
-      -- 清除技能
       room:handleAddLoseSkills(player, "-"..table.concat(player:getSkillNameList(), "|-"), nil, false)
-      
-      -- 恢复区域
       room:resumePlayerArea(target, {
         Player.WeaponSlot,
         Player.ArmorSlot,
@@ -277,51 +303,16 @@ rule:addEffect(fk.BuryVictim, {
         Player.TreasureSlot,
         Player.JudgeSlot,
       })
+      room:changeHero(player, g, false, false, true)
       
-      -- 设置新武将
-      if #chosen == 1 then
-        room:changeHero(player, chosen[1], false, false, true)
-      else
-        -- 双将
-        room:changeHero(player, chosen[1], false, false, true, chosen[2])
-      end
-      
-      -- 复活并设置体力
-      room:setPlayerProperty(player, "shield", Fk.generals[chosen[1]].shield)
+      room:setPlayerProperty(player, "shield", Fk.generals[g].shield)
       room:revivePlayer(player, false)
+      room:setPlayerProperty(player, "hp", Fk.generals[g].hp)
       
-      -- 双将体力计算
-      local hp = Fk.generals[chosen[1]].hp
-      if #chosen > 1 then
-        hp = math.floor((hp + Fk.generals[chosen[2]].hp) / 2)
-      end
-      room:setPlayerProperty(player, "hp", hp)
-      
-      -- 摸起始手牌
       local draw_data = DrawInitialData:new{ num = 4 }
       room.logic:trigger(fk.DrawInitialCards, player, draw_data)
-      
-      -- 分发起始手牌（轮流摸牌）
-      local cardIds = {}
-      for i = 1, 4 do
-        if #room.draw_pile > 0 then
-          local id = room.draw_pile[1]
-          table.insert(cardIds, id)
-          table.remove(room.draw_pile, 1)
-        end
-      end
-      
-      player:addCards(Player.Hand, cardIds)
-      for _, id in ipairs(cardIds) do
-        Fk:filterCard(id, player)
-        room:setCardArea(id, Card.PlayerHand, player.id)
-      end
-      
-      room:syncDrawPile()
-      draw_data.cards = cardIds
+      draw_data.cards = drawInit(room, player, 4)
       room.logic:trigger(fk.AfterDrawInitialCards, player, draw_data)
-      
-      -- 触发登场
       room.logic:trigger(U.Debut, player, player.general, false)
     end)
   end,
@@ -342,7 +333,6 @@ rule:addEffect(fk.AfterDrawPileShuffle, {
       toast = true,
     }
     
-    -- 第2次洗牌：桃视为酒
     if game_state.shuffle_count == 2 then
       game_state.peach_as_wine = true
       room:sendLog{
@@ -351,7 +341,6 @@ rule:addEffect(fk.AfterDrawPileShuffle, {
       }
     end
     
-    -- 第3次洗牌：每回合结束扣1点体力
     if game_state.shuffle_count >= 3 then
       game_state.hp_damage_active = true
     end
@@ -364,7 +353,6 @@ rule:addEffect(fk.CardUsing, {
     return game_state.peach_as_wine and data.card.name == "peach"
   end,
   on_refresh = function(self, event, target, player, data)
-    -- 将桃改为酒
     local room = player.room
     local new_card = room:printCard("wine", data.card.suit, data.card.number)
     data.card = Fk:getCardById(new_card.id)
@@ -384,17 +372,6 @@ rule:addEffect(fk.TurnEnd, {
       arg = player.name,
       toast = true,
     }
-  end,
-})
-
--- 双将规则：体力计算
-rule:addEffect(fk.Death, {
-  can_refresh = function(self, event, target, player, data)
-    return target == player
-  end,
-  on_refresh = function(self, event, target, player, data)
-    -- 死亡时处理武将回收
-    -- 败方武将可以收回，已在BuryVictim中处理
   end,
 })
 
