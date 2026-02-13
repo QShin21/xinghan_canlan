@@ -14,12 +14,15 @@ return {
   
   ["#xinghan-ban"] = "You are [%arg], please ban %arg2 general(s)",
   ["#xinghan-choose"] = "You are [%arg], please choose %arg2 general(s)",
+  ["#xinghan-deploy"] = "You are [%arg], available: %arg2, please select %arg3-%arg4 general(s)",
   
-  ["xinghan choose debut"] = "Choose your debut general(s) (1-2)",
+  ["xinghan choose debut"] = "Choose your debut general(s)",
+  ["xinghan reorganize"] = "Reorganize: Both players select new generals",
   
   ["@xinghan_score"] = "Score",
   ["@xinghan_round"] = "Round",
   ["@xinghan_won"] = "Generals Won",
+  ["@xinghan_round_wins"] = "Round Wins",
   ["@&xinghan_first_pool"] = "First Player Pool",
   ["@&xinghan_second_pool"] = "Second Player Pool",
   ["@&xinghan_first_locked"] = "First Player Locked",
@@ -27,6 +30,7 @@ return {
   
   ["#XinghanScore"] = "Score First %arg : %arg2 Second",
   ["#XinghanWonCount"] = "Generals Won First %arg : %arg2 Second",
+  ["#XinghanRoundWins"] = "Round Wins First %arg : %arg2 Second",
   ["#XinghanRoundWin"] = "%arg wins this round! Current score: %arg2",
   
   ["#XinghanShuffle"] = "Draw pile shuffled %arg time(s)",
@@ -49,6 +53,8 @@ return {
   ["LOCKED"] = "LOCKED",
   ["Selected: %1"] = "Selected: %1",
   ["Select %1-%2 generals"] = "Select %1-%2 generals",
+  ["Please select %1 general(s)"] = "Please select %1 general(s)",
+  ["Please select %1-%2 general(s)"] = "Please select %1-%2 general(s)",
   ["Dual General: HP = floor((HP1 + HP2) / 2)"] = "Dual General: HP = floor((HP1 + HP2) / 2)",
   ["Deploy"] = "Deploy",
 }

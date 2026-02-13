@@ -244,11 +244,11 @@ local xinghan_1v1_getLogic = function()
     room:setBanner("@xinghan_won", "获胜武将 0 : 0")
     room:setBanner("@xinghan_round_wins", "小局胜利 0 : 0")
     
-    -- 选择首发武将（可选1-2名）
+    -- 选择首发武将（获胜武将为0，可选单将或双将）
     room:doBroadcastNotify("ShowToast", Fk:translate("xinghan choose debut"))
     
-    -- 先手选择
-    local first_prompt = "#xinghan-deploy:::firstPlayer:"..#first_pool
+    -- 先手选择（获胜武将为0，min=1, max=2）
+    local first_prompt = "#xinghan-deploy:::firstPlayer:"..#first_pool..":1:2"
     local first_result = room:askToCustomDialog(first, {
       skill_name = "xinghan_1v1_mode",
       qml_path = "packages/xinghan_canlan/qml/XinghanDeploy.qml",
@@ -265,8 +265,8 @@ local xinghan_1v1_getLogic = function()
       table.insert(first_chosen, first_pool[1])
     end
     
-    -- 后手选择
-    local second_prompt = "#xinghan-deploy:::secondPlayer:"..#second_pool
+    -- 后手选择（获胜武将为0，min=1, max=2）
+    local second_prompt = "#xinghan-deploy:::secondPlayer:"..#second_pool..":1:2"
     local second_result = room:askToCustomDialog(second, {
       skill_name = "xinghan_1v1_mode",
       qml_path = "packages/xinghan_canlan/qml/XinghanDeploy.qml",
@@ -283,25 +283,23 @@ local xinghan_1v1_getLogic = function()
       table.insert(second_chosen, second_pool[1])
     end
     
-    -- 设置先手武将
+    -- 设置先手武将（使用changeHero确保正确设置）
     if #first_chosen == 1 then
-      room:setPlayerGeneral(first, first_chosen[1], true, true)
+      room:changeHero(first, first_chosen[1], false, false, true, nil, true)
       removeGeneral(first_pool, first_chosen[1])
     else
-      room:setPlayerGeneral(first, first_chosen[1], true, true)
-      room:setPlayerProperty(first, "deputyGeneral", first_chosen[2])
+      room:changeHero(first, first_chosen[1], false, false, true, first_chosen[2], true)
       removeGeneral(first_pool, first_chosen[1])
       removeGeneral(first_pool, first_chosen[2])
     end
     room:setBanner("@&xinghan_first_pool", first_pool)
     
-    -- 设置后手武将
+    -- 设置后手武将（使用changeHero确保正确设置）
     if #second_chosen == 1 then
-      room:setPlayerGeneral(second, second_chosen[1], true, true)
+      room:changeHero(second, second_chosen[1], false, false, true, nil, true)
       removeGeneral(second_pool, second_chosen[1])
     else
-      room:setPlayerGeneral(second, second_chosen[1], true, true)
-      room:setPlayerProperty(second, "deputyGeneral", second_chosen[2])
+      room:changeHero(second, second_chosen[1], false, false, true, second_chosen[2], true)
       removeGeneral(second_pool, second_chosen[1])
       removeGeneral(second_pool, second_chosen[2])
     end

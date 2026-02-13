@@ -73,6 +73,31 @@ local function addLockedGeneral(player, general)
   end
 end
 
+-- 获取玩家当前获胜武将数
+local function getWonCount(player)
+  if isFirstPlayer(player) then
+    return game_state.first_won_count
+  else
+    return game_state.second_won_count
+  end
+end
+
+-- 根据获胜武将数计算可选武将数量范围
+local function getDeployRange(won_count)
+  -- 获胜武将为0：可选单将或双将 (min=1, max=2)
+  -- 获胜武将为1：仅可选双将 (min=2, max=2)
+  -- 获胜武将为2：可选单将或双将 (min=1, max=2)
+  -- 获胜武将为3：仅可选双将 (min=2, max=2)
+  -- 获胜武将为4：仅可选单将 (min=1, max=1)
+  if won_count == 1 or won_count == 3 then
+    return 2, 2  -- 仅双将
+  elseif won_count == 4 then
+    return 1, 1  -- 仅单将
+  else
+    return 1, 2  -- 单将或双将
+  end
+end
+
 -- 摸初始手牌函数
 local function drawInit(room, player, n)
   if n <= 0 then return {} end
@@ -111,16 +136,24 @@ local function drawInit(room, player, n)
   return cardIds
 end
 
--- 选择武将函数（支持1-2名）
-local function askForDeploy(room, player, available)
+-- 选择武将函数（支持限制范围）
+local function askForDeploy(room, player, available, min_num, max_num)
   if #available == 0 then return nil end
   
-  local prompt = "#xinghan-deploy:::"..(isFirstPlayer(player) and "firstPlayer" or "secondPlayer")..":"..#available
+  -- 确保不超过可用武将数
+  min_num = math.min(min_num, #available)
+  max_num = math.min(max_num, #available)
+  -- 如果max小于min，则调整为可用数量
+  if max_num < min_num then
+    max_num = min_num
+  end
+  
+  local prompt = "#xinghan-deploy:::"..(isFirstPlayer(player) and "firstPlayer" or "secondPlayer")..":"..#available..":"..min_num..":"..max_num
   local result = room:askToCustomDialog(player, {
     skill_name = "xinghan_1v1_mode",
     qml_path = "packages/xinghan_canlan/qml/XinghanDeploy.qml",
     extra_data = {
-      available, 1, 2, {}, prompt  -- min=1, max=2
+      available, min_num, max_num, {}, prompt
     }
   })
   
@@ -131,8 +164,12 @@ local function askForDeploy(room, player, available)
       table.insert(chosen, g)
     end
   else
-    -- 超时默认选择1名
-    table.insert(chosen, available[1])
+    -- 超时默认选择min_num名
+    for i = 1, min_num do
+      if available[i] then
+        table.insert(chosen, available[i])
+      end
+    end
   end
   
   return chosen
@@ -208,7 +245,7 @@ rule:addEffect(fk.GameOverJudge, {
     end
     
     -- 败方武将不锁定，可以收回再用
-    -- 不需要做任何处理，败方武将仍在武将池中
+    -- 败方武将保留在武将池中，不需要额外处理
     
     -- 更新显示
     room:setBanner("@xinghan_won", string.format("获胜武将 %d : %d", 
@@ -307,7 +344,7 @@ rule:addEffect(fk.BuryVictim, {
     local loser_locked = getLockedGenerals(player)
     
     -- 败方武将不移除，可以收回再用
-    -- 过滤掉已锁定的武将
+    -- 过滤掉已锁定的武将（败方武将不会被锁定，所以这里应该全部可用）
     local loser_available = {}
     for _, g in ipairs(loser_pool) do
       if not table.contains(loser_locked, g) then
@@ -360,8 +397,14 @@ rule:addEffect(fk.BuryVictim, {
       -- 双方都需要重新选择武将
       room:doBroadcastNotify("ShowToast", Fk:translate("xinghan reorganize"))
       
+      -- 计算双方可选武将数量范围
+      local loser_won = getWonCount(player)
+      local winner_won = getWonCount(winner)
+      local loser_min, loser_max = getDeployRange(loser_won)
+      local winner_min, winner_max = getDeployRange(winner_won)
+      
       -- 败方选择武将
-      local loser_chosen = askForDeploy(room, player, loser_available)
+      local loser_chosen = askForDeploy(room, player, loser_available, loser_min, loser_max)
       if not loser_chosen or #loser_chosen == 0 then
         loser_chosen = { loser_available[1] }
       end
@@ -379,7 +422,7 @@ rule:addEffect(fk.BuryVictim, {
       end
       
       -- 胜方选择武将
-      local winner_chosen = askForDeploy(room, winner, winner_available)
+      local winner_chosen = askForDeploy(room, winner, winner_available, winner_min, winner_max)
       if not winner_chosen or #winner_chosen == 0 then
         winner_chosen = { winner_available[1] }
       end
@@ -407,10 +450,11 @@ rule:addEffect(fk.BuryVictim, {
         Player.JudgeSlot,
       })
       
+      -- 设置败方武将（确保清除副将）
       if #loser_chosen == 1 then
-        room:changeHero(player, loser_chosen[1], false, false, true)
+        room:changeHero(player, loser_chosen[1], false, false, true, nil, true)
       else
-        room:changeHero(player, loser_chosen[1], false, false, true, loser_chosen[2])
+        room:changeHero(player, loser_chosen[1], false, false, true, loser_chosen[2], true)
       end
       
       room:setPlayerProperty(player, "shield", Fk.generals[loser_chosen[1]].shield)
@@ -428,13 +472,13 @@ rule:addEffect(fk.BuryVictim, {
       room.logic:trigger(fk.AfterDrawInitialCards, player, draw_data)
       room.logic:trigger(U.Debut, player, player.general, false)
       
-      -- 处理胜方换将（胜方武将已经被锁定，现在选择新的武将上场）
+      -- 处理胜方换将（确保清除副将）
       room:handleAddLoseSkills(winner, "-"..table.concat(winner:getSkillNameList(), "|-"), nil, false)
       
       if #winner_chosen == 1 then
-        room:changeHero(winner, winner_chosen[1], false, false, true)
+        room:changeHero(winner, winner_chosen[1], false, false, true, nil, true)
       else
-        room:changeHero(winner, winner_chosen[1], false, false, true, winner_chosen[2])
+        room:changeHero(winner, winner_chosen[1], false, false, true, winner_chosen[2], true)
       end
       
       room:setPlayerProperty(winner, "shield", Fk.generals[winner_chosen[1]].shield)
@@ -528,7 +572,7 @@ Fk:loadTranslationTable{
   ["#XinghanAoZhanDamage"] = "鏖战：回合结束，%arg 失去1点体力",
   ["#XinghanRoundWins"] = "小局胜利 先手 %arg : %arg2 后手",
   
-  ["#xinghan-deploy"] = "你是[%arg]，请选择1-2名武将上场（可选武将数：%arg2）",
+  ["#xinghan-deploy"] = "你是[%arg]，可选武将数：%arg2，请选择%arg3-%arg4名武将上场",
   ["xinghan reorganize"] = "重整阶段：双方选择新武将上场",
   
   ["xinghan_aozhan"] = "鏖战",

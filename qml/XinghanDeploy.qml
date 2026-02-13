@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // 星汉灿烂 1v1 上阵选择界面
-// 支持选择1-2名武将上场
+// 支持选择minNum到maxNum名武将上场
 
 import QtQuick
 import QtQuick.Layouts
@@ -24,12 +24,33 @@ GraphicsBox {
   width: 620
   height: 370
 
+  // 提示信息区域
+  Rectangle {
+    id: hintArea
+    anchors.top: title.bottom
+    anchors.topMargin: 5
+    anchors.horizontalCenter: parent.horizontalCenter
+    width: parent.width - 20
+    height: 25
+    color: "transparent"
+    
+    Text {
+      anchors.centerIn: parent
+      text: minNum === maxNum ? 
+        Lua.tr("Please select %1 general(s)").arg(minNum) :
+        Lua.tr("Please select %1-%2 general(s)").arg(minNum).arg(maxNum)
+      color: "#4ecdc4"
+      font.pixelSize: 14
+      font.bold: true
+    }
+  }
+
   Flickable {
     id: cardArea
-    height: 280
+    height: 250
     width: 600
-    anchors.top: title.bottom
-    anchors.topMargin: 10
+    anchors.top: hintArea.bottom
+    anchors.topMargin: 5
     anchors.horizontalCenter: parent.horizontalCenter
 
     contentHeight: gridLayout.implicitHeight
@@ -59,18 +80,24 @@ GraphicsBox {
 
             if (chosenInBox) {
               // 取消选择
-              selectedItem.splice(root.selectedItem.indexOf(index), 1);
+              var idx = selectedItem.indexOf(index);
+              if (idx >= 0) {
+                selectedItem.splice(idx, 1);
+              }
               chosenInBox = false;
             } else {
               // 选择
               if (selectedItem.length >= maxNum) {
                 // 已达到最大数量，取消最早的选择
-                generalRepeater.itemAt(selectedItem[0]).chosenInBox = false;
+                var firstIdx = selectedItem[0];
+                generalRepeater.itemAt(firstIdx).chosenInBox = false;
                 selectedItem.splice(0, 1);
               }
+              selectedItem.push(index);
               chosenInBox = true;
-              root.selectedItem.push(index);
             }
+            // 强制更新
+            selectedItem = selectedItem.slice();
             updateSelectable();
           }
 
@@ -80,6 +107,24 @@ GraphicsBox {
           }
         }
       }
+    }
+  }
+
+  // 信息显示区域
+  Rectangle {
+    id: infoArea
+    anchors.top: cardArea.bottom
+    anchors.topMargin: 5
+    anchors.horizontalCenter: parent.horizontalCenter
+    width: parent.width - 20
+    height: 20
+    color: "transparent"
+    
+    Text {
+      anchors.centerIn: parent
+      text: Lua.tr("Selected: %1").arg(selectedItem.length)
+      color: selectedItem.length >= minNum && selectedItem.length <= maxNum ? "#4ecdc4" : "#ffffff"
+      font.pixelSize: 13
     }
   }
 
@@ -104,7 +149,7 @@ GraphicsBox {
           close();
           roomScene.state = "notactive";
           ClientInstance.replyToServer("",
-            { ids: selectedItem, generals: selectedItem.map(id => generalRepeater.itemAt(id).name) }
+            { ids: selectedItem, generals: selectedItem.map(function(id) { return generalRepeater.itemAt(id).name; }) }
           );
         }
       }
@@ -115,14 +160,15 @@ GraphicsBox {
         text: Lua.tr("Show General Detail")
         onClicked: roomScene.startCheat(
           "GeneralDetail",
-          { generals: selectedItem.map(id => generalRepeater.itemAt(id).name) }
+          { generals: selectedItem.map(function(id) { return generalRepeater.itemAt(id).name; }) }
         );
       }
     }
   }
 
   function updateSelectable() {
-    buttonConfirm.enabled = selectedItem.length >= minNum && selectedItem.length <= maxNum;
+    var valid = selectedItem.length >= minNum && selectedItem.length <= maxNum;
+    buttonConfirm.enabled = valid;
     buttonDetail.enabled = selectedItem.length > 0;
   }
 
