@@ -1,6 +1,6 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 -- 星汉灿烂 1v1 规则技能
--- 包含：先手惩罚、胜负判定、武将锁定、双将规则、鏖战规则
+-- 包含：先手惩罚、胜负判定、武将锁定、鏖战规则
 
 local rule = fk.CreateSkill {
   name = "#xinghan_1v1_rule&",
@@ -347,15 +347,42 @@ rule:addEffect(fk.AfterDrawPileShuffle, {
   end,
 })
 
--- 鏖战：桃视为酒
-rule:addEffect(fk.CardUsing, {
-  can_refresh = function(self, event, target, player, data)
-    return game_state.peach_as_wine and data.card.name == "peach"
+-- 鏖战：禁止桃作为回复牌使用
+rule:addEffect("prohibit", {
+  is_prohibited = function(self, from, to, card)
+    if game_state.peach_as_wine and card.name == "peach" then
+      -- 禁止桃作为回复牌使用（对目标使用）
+      -- 但允许桃作为酒使用（对自己使用增加伤害）
+      return false  -- 暂时允许，后续处理
+    end
+    return false
   end,
-  on_refresh = function(self, event, target, player, data)
+})
+
+-- 鏖战：桃可以作为酒使用
+rule:addEffect(fk.AskForCardUse, {
+  mute = true,
+  can_trigger = function(self, event, target, player, data)
+    return target == player and game_state.peach_as_wine and data.pattern
+  end,
+  on_cost = Util.TrueFunc,
+  on_use = function(self, event, target, player, data)
     local room = player.room
-    local new_card = room:printCard("wine", data.card.suit, data.card.number)
-    data.card = Fk:getCardById(new_card.id)
+    local pattern = data.pattern
+    
+    -- 如果在询问酒，让桃也可以使用
+    if pattern and string.find(pattern, "wine") then
+      -- 获取手牌中的桃
+      local peaches = table.filter(player:getCardIds(Player.Hand), function(id)
+        return Fk:getCardById(id).name == "peach"
+      end)
+      
+      if #peaches > 0 then
+        -- 允许使用桃作为酒
+        data.result = { from = player.id, cards = { peaches[1] } }
+        return true
+      end
+    end
   end,
 })
 

@@ -22,34 +22,15 @@ GraphicsBox {
   property bool is_ban: false
 
   title.text: Util.processPrompt(prompt)
-  width: 720
-  height: 420
-
-  // 标题区域
-  Rectangle {
-    id: headerArea
-    anchors.top: title.bottom
-    anchors.topMargin: 5
-    anchors.horizontalCenter: parent.horizontalCenter
-    width: parent.width - 20
-    height: 30
-    color: "transparent"
-    
-    Text {
-      anchors.centerIn: parent
-      text: is_ban ? Lua.tr("Ban Phase - Select generals to ban") : Lua.tr("Choose Phase - Select generals for your pool")
-      color: is_ban ? "#ff6b6b" : "#4ecdc4"
-      font.pixelSize: 16
-      font.bold: true
-    }
-  }
+  width: 620
+  height: 370
 
   Flickable {
     id: cardArea
     height: 280
-    width: 700
-    anchors.top: headerArea.bottom
-    anchors.topMargin: 5
+    width: 600
+    anchors.top: title.bottom
+    anchors.topMargin: 10
     anchors.horizontalCenter: parent.horizontalCenter
 
     contentHeight: gridLayout.implicitHeight
@@ -73,14 +54,6 @@ GraphicsBox {
           name: modelData
           selectable: !my_selected.includes(index) && !ur_selected.includes(index)
           chosenInBox: selectedItem.includes(index)
-
-          // 禁将模式下显示不同的选中效果
-          Rectangle {
-            anchors.fill: parent
-            color: is_ban && chosenInBox ? "#80ff0000" : "transparent"
-            radius: 5
-            visible: is_ban && chosenInBox
-          }
 
           onClicked: {
             if (!selectable || num == 0) return;
@@ -108,34 +81,6 @@ GraphicsBox {
     }
   }
 
-  // 信息显示区域
-  Rectangle {
-    id: infoArea
-    anchors.top: cardArea.bottom
-    anchors.topMargin: 5
-    anchors.horizontalCenter: parent.horizontalCenter
-    width: parent.width - 20
-    height: 25
-    color: "transparent"
-    
-    Row {
-      anchors.centerIn: parent
-      spacing: 20
-      
-      Text {
-        text: Lua.tr("Selected: %1 / %2").arg(selectedItem.length).arg(num)
-        color: selectedItem.length === num ? "#4ecdc4" : "#ffffff"
-        font.pixelSize: 14
-      }
-      
-      Text {
-        text: is_ban ? Lua.tr("Banned generals will be removed from the pool") : Lua.tr("Selected generals will join your pool")
-        color: "#aaaaaa"
-        font.pixelSize: 12
-      }
-    }
-  }
-
   Item {
     id: buttonArea
     height: 40
@@ -150,7 +95,7 @@ GraphicsBox {
       MetroButton {
         id: buttonConfirm
         width: 120
-        text: is_ban ? Lua.tr("Ban") : Lua.tr("Confirm")
+        text: is_ban ? Lua.tr("Ban") : Lua.tr("OK")
         enabled: selectedItem.length == num
 
         onClicked: {
@@ -164,7 +109,7 @@ GraphicsBox {
 
       MetroButton {
         id: buttonDetail
-        enabled: selectedItem.length
+        enabled: selectedItem.length > 0
         text: Lua.tr("Show General Detail")
         onClicked: roomScene.startCheat(
           "GeneralDetail",
@@ -176,11 +121,16 @@ GraphicsBox {
 
   function updateSelectable() {
     buttonConfirm.enabled = selectedItem.length == num;
-    buttonDetail.enabled = selectedItem.length;
+    buttonDetail.enabled = selectedItem.length > 0;
   }
 
   function loadData(data) {
-    [generals, num, my_selected, ur_selected, prompt, is_ban] = data;
+    generals = data[0];
+    num = data[1];
+    my_selected = data[2] || [];
+    ur_selected = data[3] || [];
+    prompt = data[4];
+    is_ban = data[5] || false;
     selectedItem = [];
   }
 }
