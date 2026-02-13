@@ -111,6 +111,33 @@ local function drawInit(room, player, n)
   return cardIds
 end
 
+-- 选择武将函数（支持1-2名）
+local function askForDeploy(room, player, available)
+  if #available == 0 then return nil end
+  
+  local prompt = "#xinghan-deploy:::"..(isFirstPlayer(player) and "firstPlayer" or "secondPlayer")..":"..#available
+  local result = room:askToCustomDialog(player, {
+    skill_name = "xinghan_1v1_mode",
+    qml_path = "packages/xinghan_canlan/qml/XinghanDeploy.qml",
+    extra_data = {
+      available, 1, 2, {}, prompt  -- min=1, max=2
+    }
+  })
+  
+  local chosen = {}
+  if result ~= "" then
+    for i, id in ipairs(result.ids) do
+      local g = result.generals[i]
+      table.insert(chosen, g)
+    end
+  else
+    -- 超时默认选择1名
+    table.insert(chosen, available[1])
+  end
+  
+  return chosen
+end
+
 -- 登场效果
 rule:addEffect(fk.GameStart, {
   can_refresh = function(self, event, target, player, data)
@@ -179,6 +206,9 @@ rule:addEffect(fk.GameOverJudge, {
     if winner.deputyGeneral and winner.deputyGeneral ~= "" then
       addLockedGeneral(winner, winner.deputyGeneral)
     end
+    
+    -- 败方武将不锁定，可以收回再用
+    -- 不需要做任何处理，败方武将仍在武将池中
     
     -- 更新显示
     room:setBanner("@xinghan_won", string.format("获胜武将 %d : %d", 
@@ -261,7 +291,7 @@ rule:addEffect(fk.GameOverJudge, {
   end,
 })
 
--- 死亡换将
+-- 死亡换将（重整阶段）
 rule:addEffect(fk.BuryVictim, {
   can_refresh = function(self, event, target, player, data)
     return target == player
@@ -272,21 +302,42 @@ rule:addEffect(fk.BuryVictim, {
     
     if player.rest > 0 then return end
     
-    local pool = getGeneralPool(player)
-    local locked = getLockedGenerals(player)
+    -- 获取败方武将池和锁定武将
+    local loser_pool = getGeneralPool(player)
+    local loser_locked = getLockedGenerals(player)
     
+    -- 败方武将不移除，可以收回再用
     -- 过滤掉已锁定的武将
-    local available = {}
-    for _, g in ipairs(pool) do
-      if not table.contains(locked, g) then
-        table.insert(available, g)
+    local loser_available = {}
+    for _, g in ipairs(loser_pool) do
+      if not table.contains(loser_locked, g) then
+        table.insert(loser_available, g)
       end
     end
     
     player:bury()
     
-    if #available == 0 then
-      room:gameOver(player.next.role)
+    -- 获取胜方信息
+    local winner = player.next
+    local winner_pool = getGeneralPool(winner)
+    local winner_locked = getLockedGenerals(winner)
+    
+    -- 过滤掉胜方已锁定的武将
+    local winner_available = {}
+    for _, g in ipairs(winner_pool) do
+      if not table.contains(winner_locked, g) then
+        table.insert(winner_available, g)
+      end
+    end
+    
+    -- 检查是否有人没有可用武将
+    if #loser_available == 0 then
+      room:gameOver(winner.role)
+      return
+    end
+    
+    if #winner_available == 0 then
+      room:gameOver(player.role)
       return
     end
     
@@ -306,28 +357,46 @@ rule:addEffect(fk.BuryVictim, {
     end
     
     last_event:addCleaner(function()
-      -- 选择新武将上场（可选1-2名）
-      local max_choose = math.min(2, #available)
-      local req = Request:new({player}, "AskForGeneral")
-      req.timeout = room:getSettings('generalTimeout')
-      req:setData(player, { available, max_choose })
-      req:setDefaultReply(player, { available[1] })
-      req:ask()
+      -- 双方都需要重新选择武将
+      room:doBroadcastNotify("ShowToast", Fk:translate("xinghan reorganize"))
       
-      local chosen = req:getResult(player)
-      
-      -- 移除已选武将
-      for _, g in ipairs(chosen) do
-        removeGeneral(pool, g)
+      -- 败方选择武将
+      local loser_chosen = askForDeploy(room, player, loser_available)
+      if not loser_chosen or #loser_chosen == 0 then
+        loser_chosen = { loser_available[1] }
       end
       
-      -- 更新武将池
+      -- 从败方武将池移除已选武将
+      for _, g in ipairs(loser_chosen) do
+        removeGeneral(loser_pool, g)
+      end
+      
+      -- 更新败方武将池
       if isFirstPlayer(player) then
-        room:setBanner("@&xinghan_first_pool", pool)
+        room:setBanner("@&xinghan_first_pool", loser_pool)
       else
-        room:setBanner("@&xinghan_second_pool", pool)
+        room:setBanner("@&xinghan_second_pool", loser_pool)
       end
       
+      -- 胜方选择武将
+      local winner_chosen = askForDeploy(room, winner, winner_available)
+      if not winner_chosen or #winner_chosen == 0 then
+        winner_chosen = { winner_available[1] }
+      end
+      
+      -- 从胜方武将池移除已选武将
+      for _, g in ipairs(winner_chosen) do
+        removeGeneral(winner_pool, g)
+      end
+      
+      -- 更新胜方武将池
+      if isFirstPlayer(winner) then
+        room:setBanner("@&xinghan_first_pool", winner_pool)
+      else
+        room:setBanner("@&xinghan_second_pool", winner_pool)
+      end
+      
+      -- 处理败方复活
       room:handleAddLoseSkills(player, "-"..table.concat(player:getSkillNameList(), "|-"), nil, false)
       room:resumePlayerArea(target, {
         Player.WeaponSlot,
@@ -338,30 +407,45 @@ rule:addEffect(fk.BuryVictim, {
         Player.JudgeSlot,
       })
       
-      -- 设置新武将
-      if #chosen == 1 then
-        room:changeHero(player, chosen[1], false, false, true)
+      if #loser_chosen == 1 then
+        room:changeHero(player, loser_chosen[1], false, false, true)
       else
-        -- 双将
-        room:changeHero(player, chosen[1], false, false, true, chosen[2])
+        room:changeHero(player, loser_chosen[1], false, false, true, loser_chosen[2])
       end
       
-      -- 复活并设置体力
-      room:setPlayerProperty(player, "shield", Fk.generals[chosen[1]].shield)
+      room:setPlayerProperty(player, "shield", Fk.generals[loser_chosen[1]].shield)
       room:revivePlayer(player, false)
       
-      -- 双将体力计算
-      local hp = Fk.generals[chosen[1]].hp
-      if #chosen > 1 then
-        hp = math.floor((hp + Fk.generals[chosen[2]].hp) / 2)
+      local loser_hp = Fk.generals[loser_chosen[1]].hp
+      if #loser_chosen > 1 then
+        loser_hp = math.floor((loser_hp + Fk.generals[loser_chosen[2]].hp) / 2)
       end
-      room:setPlayerProperty(player, "hp", hp)
+      room:setPlayerProperty(player, "hp", loser_hp)
       
       local draw_data = DrawInitialData:new{ num = 4 }
       room.logic:trigger(fk.DrawInitialCards, player, draw_data)
       draw_data.cards = drawInit(room, player, 4)
       room.logic:trigger(fk.AfterDrawInitialCards, player, draw_data)
       room.logic:trigger(U.Debut, player, player.general, false)
+      
+      -- 处理胜方换将（胜方武将已经被锁定，现在选择新的武将上场）
+      room:handleAddLoseSkills(winner, "-"..table.concat(winner:getSkillNameList(), "|-"), nil, false)
+      
+      if #winner_chosen == 1 then
+        room:changeHero(winner, winner_chosen[1], false, false, true)
+      else
+        room:changeHero(winner, winner_chosen[1], false, false, true, winner_chosen[2])
+      end
+      
+      room:setPlayerProperty(winner, "shield", Fk.generals[winner_chosen[1]].shield)
+      
+      local winner_hp = Fk.generals[winner_chosen[1]].hp
+      if #winner_chosen > 1 then
+        winner_hp = math.floor((winner_hp + Fk.generals[winner_chosen[2]].hp) / 2)
+      end
+      room:setPlayerProperty(winner, "hp", winner_hp)
+      
+      room.logic:trigger(U.Debut, winner, winner.general, false)
     end)
   end,
 })
@@ -406,15 +490,12 @@ rule:addEffect(fk.AskForCardUse, {
     local room = player.room
     local pattern = data.pattern
     
-    -- 如果在询问酒，让桃也可以使用
     if pattern and string.find(pattern, "wine") then
-      -- 获取手牌中的桃
       local peaches = table.filter(player:getCardIds(Player.Hand), function(id)
         return Fk:getCardById(id).name == "peach"
       end)
       
       if #peaches > 0 then
-        -- 允许使用桃作为酒
         data.result = { from = player.id, cards = { peaches[1] } }
         return true
       end
@@ -446,6 +527,9 @@ Fk:loadTranslationTable{
   ["#XinghanPeachAsWine"] = "鏖战开始：【桃】视为【酒】",
   ["#XinghanAoZhanDamage"] = "鏖战：回合结束，%arg 失去1点体力",
   ["#XinghanRoundWins"] = "小局胜利 先手 %arg : %arg2 后手",
+  
+  ["#xinghan-deploy"] = "你是[%arg]，请选择1-2名武将上场（可选武将数：%arg2）",
+  ["xinghan reorganize"] = "重整阶段：双方选择新武将上场",
   
   ["xinghan_aozhan"] = "鏖战",
 }

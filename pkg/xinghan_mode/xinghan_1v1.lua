@@ -242,41 +242,70 @@ local xinghan_1v1_getLogic = function()
     room:setBanner("@xinghan_score", "0 : 0")
     room:setBanner("@xinghan_round", "第 1 局")
     room:setBanner("@xinghan_won", "获胜武将 0 : 0")
+    room:setBanner("@xinghan_round_wins", "小局胜利 0 : 0")
     
     -- 选择首发武将（可选1-2名）
     room:doBroadcastNotify("ShowToast", Fk:translate("xinghan choose debut"))
     
-    local req = Request:new(room.players, "AskForGeneral")
-    req.timeout = room:getSettings('generalTimeout')
-    req:setData(first, { first_pool, 2 })  -- 可选1-2名
-    req:setData(second, { second_pool, 2 })
-    req:setDefaultReply(first, { first_pool[1] })
-    req:setDefaultReply(second, { second_pool[1] })
-    req:ask()
+    -- 先手选择
+    local first_prompt = "#xinghan-deploy:::firstPlayer:"..#first_pool
+    local first_result = room:askToCustomDialog(first, {
+      skill_name = "xinghan_1v1_mode",
+      qml_path = "packages/xinghan_canlan/qml/XinghanDeploy.qml",
+      extra_data = { first_pool, 1, 2, {}, first_prompt }
+    })
     
-    -- 设置玩家武将
-    for _, p in ipairs(room.players) do
-      local pool = (p == first) and first_pool or second_pool
-      local chosen_generals = req:getResult(p)
-      
-      if #chosen_generals == 1 then
-        -- 单将
-        room:setPlayerGeneral(p, chosen_generals[1], true, true)
-        removeGeneral(pool, chosen_generals[1])
-      else
-        -- 双将
-        room:setPlayerGeneral(p, chosen_generals[1], true, true)
-        room:setPlayerProperty(p, "deputyGeneral", chosen_generals[2])
-        removeGeneral(pool, chosen_generals[1])
-        removeGeneral(pool, chosen_generals[2])
+    local first_chosen = {}
+    if first_result ~= "" then
+      for i, id in ipairs(first_result.ids) do
+        local g = first_result.generals[i]
+        table.insert(first_chosen, g)
       end
-      
-      if p == first then
-        room:setBanner("@&xinghan_first_pool", pool)
-      else
-        room:setBanner("@&xinghan_second_pool", pool)
-      end
+    else
+      table.insert(first_chosen, first_pool[1])
     end
+    
+    -- 后手选择
+    local second_prompt = "#xinghan-deploy:::secondPlayer:"..#second_pool
+    local second_result = room:askToCustomDialog(second, {
+      skill_name = "xinghan_1v1_mode",
+      qml_path = "packages/xinghan_canlan/qml/XinghanDeploy.qml",
+      extra_data = { second_pool, 1, 2, {}, second_prompt }
+    })
+    
+    local second_chosen = {}
+    if second_result ~= "" then
+      for i, id in ipairs(second_result.ids) do
+        local g = second_result.generals[i]
+        table.insert(second_chosen, g)
+      end
+    else
+      table.insert(second_chosen, second_pool[1])
+    end
+    
+    -- 设置先手武将
+    if #first_chosen == 1 then
+      room:setPlayerGeneral(first, first_chosen[1], true, true)
+      removeGeneral(first_pool, first_chosen[1])
+    else
+      room:setPlayerGeneral(first, first_chosen[1], true, true)
+      room:setPlayerProperty(first, "deputyGeneral", first_chosen[2])
+      removeGeneral(first_pool, first_chosen[1])
+      removeGeneral(first_pool, first_chosen[2])
+    end
+    room:setBanner("@&xinghan_first_pool", first_pool)
+    
+    -- 设置后手武将
+    if #second_chosen == 1 then
+      room:setPlayerGeneral(second, second_chosen[1], true, true)
+      removeGeneral(second_pool, second_chosen[1])
+    else
+      room:setPlayerGeneral(second, second_chosen[1], true, true)
+      room:setPlayerProperty(second, "deputyGeneral", second_chosen[2])
+      removeGeneral(second_pool, second_chosen[1])
+      removeGeneral(second_pool, second_chosen[2])
+    end
+    room:setBanner("@&xinghan_second_pool", second_pool)
     
     room:broadcastProperty(first, "general")
     room:broadcastProperty(second, "general")

@@ -15,50 +15,21 @@ GraphicsBox {
 
   property var generals: []
   property var selectedItem: []
-  property var lockedGenerals: []
   property int minNum: 1
   property int maxNum: 2
+  property var lockedGenerals: []
   property string prompt: ""
 
   title.text: Util.processPrompt(prompt)
-  width: 720
-  height: 450
-
-  // 标题区域
-  Rectangle {
-    id: headerArea
-    anchors.top: title.bottom
-    anchors.topMargin: 5
-    anchors.horizontalCenter: parent.horizontalCenter
-    width: parent.width - 20
-    height: 30
-    color: "transparent"
-    
-    Row {
-      anchors.centerIn: parent
-      spacing: 30
-      
-      Text {
-        text: Lua.tr("Available Generals")
-        color: "#4ecdc4"
-        font.pixelSize: 14
-        font.bold: true
-      }
-      
-      Text {
-        text: Lua.tr("Locked Generals: %1").arg(lockedGenerals.length)
-        color: "#ff6b6b"
-        font.pixelSize: 14
-      }
-    }
-  }
+  width: 620
+  height: 370
 
   Flickable {
     id: cardArea
     height: 280
-    width: 700
-    anchors.top: headerArea.bottom
-    anchors.topMargin: 5
+    width: 600
+    anchors.top: title.bottom
+    anchors.topMargin: 10
     anchors.horizontalCenter: parent.horizontalCenter
 
     contentHeight: gridLayout.implicitHeight
@@ -83,31 +54,17 @@ GraphicsBox {
           selectable: !lockedGenerals.includes(modelData)
           chosenInBox: selectedItem.includes(index)
 
-          // 锁定武将显示灰色遮罩
-          Rectangle {
-            anchors.fill: parent
-            color: "#80000000"
-            radius: 5
-            visible: lockedGenerals.includes(modelData)
-            
-            Text {
-              anchors.centerIn: parent
-              text: Lua.tr("LOCKED")
-              color: "#ff6b6b"
-              font.pixelSize: 16
-              font.bold: true
-            }
-          }
-
           onClicked: {
-            if (!selectable || maxNum == 0) return;
+            if (!selectable) return;
 
             if (chosenInBox) {
+              // 取消选择
               selectedItem.splice(root.selectedItem.indexOf(index), 1);
               chosenInBox = false;
             } else {
+              // 选择
               if (selectedItem.length >= maxNum) {
-                // 取消最早的选择
+                // 已达到最大数量，取消最早的选择
                 generalRepeater.itemAt(selectedItem[0]).chosenInBox = false;
                 selectedItem.splice(0, 1);
               }
@@ -122,41 +79,6 @@ GraphicsBox {
               roomScene.startCheat("FreeAssign", { card: this });
           }
         }
-      }
-    }
-  }
-
-  // 信息显示区域
-  Rectangle {
-    id: infoArea
-    anchors.top: cardArea.bottom
-    anchors.topMargin: 5
-    anchors.horizontalCenter: parent.horizontalCenter
-    width: parent.width - 20
-    height: 25
-    color: "transparent"
-    
-    Row {
-      anchors.centerIn: parent
-      spacing: 20
-      
-      Text {
-        text: Lua.tr("Selected: %1").arg(selectedItem.length)
-        color: selectedItem.length >= minNum ? "#4ecdc4" : "#ffffff"
-        font.pixelSize: 14
-      }
-      
-      Text {
-        text: Lua.tr("Select %1-%2 generals").arg(minNum).arg(maxNum)
-        color: "#aaaaaa"
-        font.pixelSize: 12
-      }
-      
-      Text {
-        text: Lua.tr("Dual General: HP = floor((HP1 + HP2) / 2)")
-        color: "#aaaaaa"
-        font.pixelSize: 12
-        visible: maxNum >= 2
       }
     }
   }
@@ -189,7 +111,7 @@ GraphicsBox {
 
       MetroButton {
         id: buttonDetail
-        enabled: selectedItem.length
+        enabled: selectedItem.length > 0
         text: Lua.tr("Show General Detail")
         onClicked: roomScene.startCheat(
           "GeneralDetail",
@@ -201,11 +123,16 @@ GraphicsBox {
 
   function updateSelectable() {
     buttonConfirm.enabled = selectedItem.length >= minNum && selectedItem.length <= maxNum;
-    buttonDetail.enabled = selectedItem.length;
+    buttonDetail.enabled = selectedItem.length > 0;
   }
 
   function loadData(data) {
-    [generals, minNum, maxNum, lockedGenerals, prompt] = data;
+    generals = data[0] || [];
+    minNum = data[1] || 1;
+    maxNum = data[2] || 2;
+    lockedGenerals = data[3] || [];
+    prompt = data[4] || "";
     selectedItem = [];
+    updateSelectable();
   }
 }
