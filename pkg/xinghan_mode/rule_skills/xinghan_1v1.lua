@@ -6,6 +6,8 @@ local rule = fk.CreateSkill {
   name = "#xinghan_1v1_rule&",
 }
 
+local U = require "packages.xinghan_canlan.pkg.xinghan_mode.xinghan_util"
+
 -- 游戏状态存储
 local game_state = {
   round_count = 1,
@@ -77,8 +79,8 @@ rule:addEffect(fk.GameStart, {
   on_refresh = function(self, event, target, player, data)
     local room = player.room
     -- 触发登场事件
-    room.logic:trigger(fk.Debut, player, player.general, false)
-    room.logic:trigger(fk.Debut, player.next, player.next.general, false)
+    room.logic:trigger(U.Debut, player, player.general, false)
+    room.logic:trigger(U.Debut, player.next, player.next.general, false)
   end,
 })
 
@@ -320,13 +322,13 @@ rule:addEffect(fk.BuryVictim, {
       room.logic:trigger(fk.AfterDrawInitialCards, player, draw_data)
       
       -- 触发登场
-      room.logic:trigger(fk.Debut, player, player.general, false)
+      room.logic:trigger(U.Debut, player, player.general, false)
     end)
   end,
 })
 
 -- 洗牌计数（鏖战规则）
-rule:addEffect(fk.AfterDrawPileShuffled, {
+rule:addEffect(fk.AfterDrawPileShuffle, {
   can_refresh = function(self, event, target, player, data)
     return true
   end,
