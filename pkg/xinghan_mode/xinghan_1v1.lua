@@ -283,30 +283,36 @@ local xinghan_1v1_getLogic = function()
       table.insert(second_chosen, second_pool[1])
     end
     
-    -- 设置先手武将（使用changeHero确保正确设置）
-    if #first_chosen == 1 then
-      room:changeHero(first, first_chosen[1], false, false, true, nil, true)
-      removeGeneral(first_pool, first_chosen[1])
+    -- 设置先手武将（使用正确的方式设置双将）
+    room:setPlayerGeneral(first, first_chosen[1], true, true)
+    if #first_chosen > 1 then
+      first.deputyGeneral = first_chosen[2]
     else
-      room:changeHero(first, first_chosen[1], false, false, true, first_chosen[2], true)
-      removeGeneral(first_pool, first_chosen[1])
-      removeGeneral(first_pool, first_chosen[2])
+      first.deputyGeneral = ""
+    end
+    room:broadcastProperty(first, "general")
+    room:broadcastProperty(first, "deputyGeneral")
+    
+    for _, g in ipairs(first_chosen) do
+      removeGeneral(first_pool, g)
     end
     room:setBanner("@&xinghan_first_pool", first_pool)
     
-    -- 设置后手武将（使用changeHero确保正确设置）
-    if #second_chosen == 1 then
-      room:changeHero(second, second_chosen[1], false, false, true, nil, true)
-      removeGeneral(second_pool, second_chosen[1])
+    -- 设置后手武将（使用正确的方式设置双将）
+    room:setPlayerGeneral(second, second_chosen[1], true, true)
+    if #second_chosen > 1 then
+      second.deputyGeneral = second_chosen[2]
     else
-      room:changeHero(second, second_chosen[1], false, false, true, second_chosen[2], true)
-      removeGeneral(second_pool, second_chosen[1])
-      removeGeneral(second_pool, second_chosen[2])
+      second.deputyGeneral = ""
+    end
+    room:broadcastProperty(second, "general")
+    room:broadcastProperty(second, "deputyGeneral")
+    
+    for _, g in ipairs(second_chosen) do
+      removeGeneral(second_pool, g)
     end
     room:setBanner("@&xinghan_second_pool", second_pool)
     
-    room:broadcastProperty(first, "general")
-    room:broadcastProperty(second, "general")
     room:broadcastProperty(first, "kingdom")
     room:broadcastProperty(second, "kingdom")
     

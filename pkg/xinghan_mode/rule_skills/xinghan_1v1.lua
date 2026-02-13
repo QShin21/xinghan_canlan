@@ -245,7 +245,18 @@ rule:addEffect(fk.GameOverJudge, {
     end
     
     -- 败方武将不锁定，可以收回再用
-    -- 败方武将保留在武将池中，不需要额外处理
+    -- 将败方刚才使用的武将加回到武将池中
+    local loser_pool = getGeneralPool(loser)
+    table.insert(loser_pool, loser.general)
+    if loser.deputyGeneral and loser.deputyGeneral ~= "" then
+      table.insert(loser_pool, loser.deputyGeneral)
+    end
+    -- 更新败方武将池
+    if isFirstPlayer(loser) then
+      room:setBanner("@&xinghan_first_pool", loser_pool)
+    else
+      room:setBanner("@&xinghan_second_pool", loser_pool)
+    end
     
     -- 更新显示
     room:setBanner("@xinghan_won", string.format("获胜武将 %d : %d", 
@@ -343,8 +354,7 @@ rule:addEffect(fk.BuryVictim, {
     local loser_pool = getGeneralPool(player)
     local loser_locked = getLockedGenerals(player)
     
-    -- 败方武将不移除，可以收回再用
-    -- 过滤掉已锁定的武将（败方武将不会被锁定，所以这里应该全部可用）
+    -- 过滤掉已锁定的武将
     local loser_available = {}
     for _, g in ipairs(loser_pool) do
       if not table.contains(loser_locked, g) then
@@ -450,12 +460,15 @@ rule:addEffect(fk.BuryVictim, {
         Player.JudgeSlot,
       })
       
-      -- 设置败方武将（确保清除副将）
-      if #loser_chosen == 1 then
-        room:changeHero(player, loser_chosen[1], false, false, true, nil, true)
+      -- 设置败方武将（使用正确的方式设置双将）
+      room:setPlayerGeneral(player, loser_chosen[1], true, true)
+      if #loser_chosen > 1 then
+        player.deputyGeneral = loser_chosen[2]
       else
-        room:changeHero(player, loser_chosen[1], false, false, true, loser_chosen[2], true)
+        player.deputyGeneral = ""
       end
+      room:broadcastProperty(player, "general")
+      room:broadcastProperty(player, "deputyGeneral")
       
       room:setPlayerProperty(player, "shield", Fk.generals[loser_chosen[1]].shield)
       room:revivePlayer(player, false)
@@ -465,6 +478,7 @@ rule:addEffect(fk.BuryVictim, {
         loser_hp = math.floor((loser_hp + Fk.generals[loser_chosen[2]].hp) / 2)
       end
       room:setPlayerProperty(player, "hp", loser_hp)
+      room:setPlayerProperty(player, "maxHp", loser_hp)
       
       local draw_data = DrawInitialData:new{ num = 4 }
       room.logic:trigger(fk.DrawInitialCards, player, draw_data)
@@ -472,14 +486,18 @@ rule:addEffect(fk.BuryVictim, {
       room.logic:trigger(fk.AfterDrawInitialCards, player, draw_data)
       room.logic:trigger(U.Debut, player, player.general, false)
       
-      -- 处理胜方换将（确保清除副将）
+      -- 处理胜方换将
       room:handleAddLoseSkills(winner, "-"..table.concat(winner:getSkillNameList(), "|-"), nil, false)
       
-      if #winner_chosen == 1 then
-        room:changeHero(winner, winner_chosen[1], false, false, true, nil, true)
+      -- 设置胜方武将（使用正确的方式设置双将）
+      room:setPlayerGeneral(winner, winner_chosen[1], true, true)
+      if #winner_chosen > 1 then
+        winner.deputyGeneral = winner_chosen[2]
       else
-        room:changeHero(winner, winner_chosen[1], false, false, true, winner_chosen[2], true)
+        winner.deputyGeneral = ""
       end
+      room:broadcastProperty(winner, "general")
+      room:broadcastProperty(winner, "deputyGeneral")
       
       room:setPlayerProperty(winner, "shield", Fk.generals[winner_chosen[1]].shield)
       
@@ -488,6 +506,7 @@ rule:addEffect(fk.BuryVictim, {
         winner_hp = math.floor((winner_hp + Fk.generals[winner_chosen[2]].hp) / 2)
       end
       room:setPlayerProperty(winner, "hp", winner_hp)
+      room:setPlayerProperty(winner, "maxHp", winner_hp)
       
       room.logic:trigger(U.Debut, winner, winner.general, false)
     end)
