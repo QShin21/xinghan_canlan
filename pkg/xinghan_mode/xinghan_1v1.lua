@@ -109,136 +109,123 @@ local xinghan_1v1_getLogic = function()
     
     -- 获取18张武将
     local all_generals = room:getNGenerals(18)
-    local first_selected = {}
-    local second_selected = {}
     
-    -- 更新武将池显示
-    local updateGeneralPile = function(p, generals)
-      if p == first then
-        room:setBanner("@&xinghan_first_pool", generals)
-      else
-        room:setBanner("@&xinghan_second_pool", generals)
-      end
-    end
-    
-    -- 禁将/选将通用函数
-    local function askForGeneral(p, n, is_ban, prompt_key)
-      local my_selected = (p == first) and first_selected or second_selected
-      local ur_selected = (p == first) and second_selected or first_selected
-      local prompt = "#xinghan-"..prompt_key..":::"..(p == first and "firstPlayer" or "secondPlayer")..":"..n
-      
+    -- 禁将阶段
+    local function doBan(p, n)
+      local prompt = "#xinghan-ban:::"..(p == first and "firstPlayer" or "secondPlayer")..":"..n
       local result = room:askToCustomDialog(p, {
         skill_name = "xinghan_1v1_mode",
         qml_path = "packages/xinghan_canlan/qml/XinghanSelect.qml",
         extra_data = {
-          all_generals, n, my_selected, ur_selected, prompt, is_ban
+          all_generals, n, {}, {}, prompt, true
         }
       })
       
-      local selected = {}
+      local banned = {}
       if result ~= "" then
         for i, id in ipairs(result.ids) do
           local g = result.generals[i]
-          all_generals[id + 1] = g
-          table.insert(my_selected, id)
-          table.insert(selected, g)
+          table.insert(banned, g)
         end
       else
         -- 超时默认选择最左侧
-        local selected_list = table.connect(my_selected, ur_selected)
-        for i, g in ipairs(all_generals) do
-          if not table.contains(selected_list, i - 1) then
-            table.insert(my_selected, i - 1)
-            table.insert(selected, g)
-            if #selected == n then break end
+        for i = 1, n do
+          if #all_generals > 0 then
+            table.insert(banned, all_generals[1])
           end
         end
       end
       
-      return selected
+      -- 从武将池移除禁用的武将
+      for _, g in ipairs(banned) do
+        removeGeneral(all_generals, g)
+      end
+      
+      return banned
+    end
+    
+    -- 选将函数
+    local function doChoose(p, n)
+      local prompt = "#xinghan-choose:::"..(p == first and "firstPlayer" or "secondPlayer")..":"..n
+      local result = room:askToCustomDialog(p, {
+        skill_name = "xinghan_1v1_mode",
+        qml_path = "packages/xinghan_canlan/qml/XinghanSelect.qml",
+        extra_data = {
+          all_generals, n, {}, {}, prompt, false
+        }
+      })
+      
+      local chosen = {}
+      if result ~= "" then
+        for i, id in ipairs(result.ids) do
+          local g = result.generals[i]
+          table.insert(chosen, g)
+        end
+      else
+        -- 超时默认选择最左侧
+        for i = 1, n do
+          if #all_generals > 0 then
+            table.insert(chosen, all_generals[1])
+          end
+        end
+      end
+      
+      -- 从武将池移除已选武将
+      for _, g in ipairs(chosen) do
+        removeGeneral(all_generals, g)
+      end
+      
+      return chosen
     end
     
     -- 禁将阶段
-    local banned = askForGeneral(second, 1, true, "ban")
-    for _, g in ipairs(banned) do
-      removeGeneral(all_generals, g)
-    end
+    local banned = doBan(second, 1)
     room:sendLog{ type = "#XinghanBanLog", arg = "secondPlayer", arg2 = banned[1] or "", toast = true }
     
-    banned = askForGeneral(first, 2, true, "ban")
-    for _, g in ipairs(banned) do
-      removeGeneral(all_generals, g)
-    end
+    banned = doBan(first, 2)
     room:sendLog{ type = "#XinghanBanLog", arg = "firstPlayer", arg2 = table.concat(banned, ", "), toast = true }
     
-    banned = askForGeneral(second, 1, true, "ban")
-    for _, g in ipairs(banned) do
-      removeGeneral(all_generals, g)
-    end
+    banned = doBan(second, 1)
     room:sendLog{ type = "#XinghanBanLog", arg = "secondPlayer", arg2 = banned[1] or "", toast = true }
-    
-    -- 重置选择状态
-    first_selected = {}
-    second_selected = {}
     
     -- 选将阶段
     local first_pool = {}
     local second_pool = {}
+    local chosen
     
     -- 步骤1：后手方选择1名
-    local chosen = askForGeneral(second, 1, false, "choose")
-    for _, g in ipairs(chosen) do
-      table.insert(second_pool, g)
-      removeGeneral(all_generals, g)
-    end
+    chosen = doChoose(second, 1)
+    for _, g in ipairs(chosen) do table.insert(second_pool, g) end
     room:sendLog{ type = "#XinghanChooseLog", arg = "secondPlayer", arg2 = chosen[1] or "", toast = true }
     
     -- 步骤2：先手方选择2名
-    chosen = askForGeneral(first, 2, false, "choose")
-    for _, g in ipairs(chosen) do
-      table.insert(first_pool, g)
-      removeGeneral(all_generals, g)
-    end
+    chosen = doChoose(first, 2)
+    for _, g in ipairs(chosen) do table.insert(first_pool, g) end
     room:sendLog{ type = "#XinghanChooseLog", arg = "firstPlayer", arg2 = table.concat(chosen, ", "), toast = true }
     
     -- 步骤3：后手方选择2名
-    chosen = askForGeneral(second, 2, false, "choose")
-    for _, g in ipairs(chosen) do
-      table.insert(second_pool, g)
-      removeGeneral(all_generals, g)
-    end
+    chosen = doChoose(second, 2)
+    for _, g in ipairs(chosen) do table.insert(second_pool, g) end
     room:sendLog{ type = "#XinghanChooseLog", arg = "secondPlayer", arg2 = table.concat(chosen, ", "), toast = true }
     
     -- 步骤4：先手方选择2名
-    chosen = askForGeneral(first, 2, false, "choose")
-    for _, g in ipairs(chosen) do
-      table.insert(first_pool, g)
-      removeGeneral(all_generals, g)
-    end
+    chosen = doChoose(first, 2)
+    for _, g in ipairs(chosen) do table.insert(first_pool, g) end
     room:sendLog{ type = "#XinghanChooseLog", arg = "firstPlayer", arg2 = table.concat(chosen, ", "), toast = true }
     
     -- 步骤5：后手方选择2名
-    chosen = askForGeneral(second, 2, false, "choose")
-    for _, g in ipairs(chosen) do
-      table.insert(second_pool, g)
-      removeGeneral(all_generals, g)
-    end
+    chosen = doChoose(second, 2)
+    for _, g in ipairs(chosen) do table.insert(second_pool, g) end
     room:sendLog{ type = "#XinghanChooseLog", arg = "secondPlayer", arg2 = table.concat(chosen, ", "), toast = true }
     
     -- 步骤6：先手方选择2名
-    chosen = askForGeneral(first, 2, false, "choose")
-    for _, g in ipairs(chosen) do
-      table.insert(first_pool, g)
-      removeGeneral(all_generals, g)
-    end
+    chosen = doChoose(first, 2)
+    for _, g in ipairs(chosen) do table.insert(first_pool, g) end
     room:sendLog{ type = "#XinghanChooseLog", arg = "firstPlayer", arg2 = table.concat(chosen, ", "), toast = true }
     
     -- 步骤7：后手方选择2名
-    chosen = askForGeneral(second, 2, false, "choose")
-    for _, g in ipairs(chosen) do
-      table.insert(second_pool, g)
-      removeGeneral(all_generals, g)
-    end
+    chosen = doChoose(second, 2)
+    for _, g in ipairs(chosen) do table.insert(second_pool, g) end
     room:sendLog{ type = "#XinghanChooseLog", arg = "secondPlayer", arg2 = table.concat(chosen, ", "), toast = true }
     
     -- 步骤8：先手方获得剩余1名
@@ -248,15 +235,15 @@ local xinghan_1v1_getLogic = function()
     end
     
     -- 设置武将池显示
-    updateGeneralPile(first, first_pool)
-    updateGeneralPile(second, second_pool)
+    room:setBanner("@&xinghan_first_pool", first_pool)
+    room:setBanner("@&xinghan_second_pool", second_pool)
     
     -- 设置比分显示
     room:setBanner("@xinghan_score", "0 : 0")
     room:setBanner("@xinghan_round", "第 1 局")
     room:setBanner("@xinghan_won", "获胜武将 0 : 0")
     
-    -- 选择首发武将（简化为只选1名）
+    -- 选择首发武将
     room:doBroadcastNotify("ShowToast", Fk:translate("xinghan choose debut"))
     
     local req = Request:new(room.players, "AskForGeneral")
@@ -275,7 +262,11 @@ local xinghan_1v1_getLogic = function()
       room:setPlayerGeneral(p, chosen_general, true, true)
       removeGeneral(pool, chosen_general)
       
-      updateGeneralPile(p, pool)
+      if p == first then
+        room:setBanner("@&xinghan_first_pool", pool)
+      else
+        room:setBanner("@&xinghan_second_pool", pool)
+      end
     end
     
     room:broadcastProperty(first, "general")
