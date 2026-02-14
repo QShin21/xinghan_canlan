@@ -15,6 +15,7 @@ local game_state = {
   shuffle_count = 0,
   peach_as_wine = false,
   hp_damage_active = false,
+  first_draw_penalty = false, -- 一号位第一次摸牌惩罚标记
 }
 
 -- 从武将池中移除武将
@@ -182,10 +183,10 @@ rule:addEffect(fk.DrawInitialCards, {
 -- 先手第一回合少摸一张牌
 rule:addEffect(fk.DrawNCards, {
   can_refresh = function(self, event, target, player, data)
-    return target == player and isFirstPlayer(player) and player.room:getBanner(self.name) == nil
+    return target == player and isFirstPlayer(player) and not game_state.first_draw_penalty
   end,
   on_refresh = function(self, event, target, player, data)
-    player.room:setBanner(self.name, 1)
+    game_state.first_draw_penalty = true
     data.n = data.n - 1
   end,
 })
@@ -329,6 +330,14 @@ rule:addEffect(fk.BuryVictim, {
     last_event:addCleaner(function()
       room:doBroadcastNotify("ShowToast", Fk:translate("xinghan reorganize"))
       
+      -- 双方所有区域的牌全部进入弃牌堆
+      -- 胜方弃牌
+      winner:throwAllCards("h")
+      winner:throwAllCards("e")
+      winner:throwAllCards("j")
+      -- 败方弃牌（虽然已经死亡，但可能有判定区的牌）
+      player:throwAllCards("j")
+      
       -- 根据可选武将数量计算选将范围
       local loser_min, loser_max = getDeployRange(#loser_available)
       local winner_min, winner_max = getDeployRange(#winner_available)
@@ -391,12 +400,6 @@ rule:addEffect(fk.BuryVictim, {
       room:setPlayerProperty(player, "hp", loser_hp)
       room:setPlayerProperty(player, "maxHp", loser_hp)
       
-      local draw_data = DrawInitialData:new{ num = 4 }
-      room.logic:trigger(fk.DrawInitialCards, player, draw_data)
-      draw_data.cards = drawInit(room, player, 4)
-      room.logic:trigger(fk.AfterDrawInitialCards, player, draw_data)
-      room.logic:trigger(U.Debut, player, player.general, false)
-      
       -- 使用 changeHero 设置胜方武将
       room:changeHero(winner, winner_chosen[1], false, false, false, true, false)
       if #winner_chosen > 1 then
@@ -413,6 +416,43 @@ rule:addEffect(fk.BuryVictim, {
       room:setPlayerProperty(winner, "hp", winner_hp)
       room:setPlayerProperty(winner, "maxHp", winner_hp)
       
+      -- 交换座位：找到一号位（主公）和二号位（内奸）
+      local lord = nil
+      local renegade = nil
+      for _, p in ipairs(room.players) do
+        if p.role == "lord" then
+          lord = p
+        elseif p.role == "renegade" then
+          renegade = p
+        end
+      end
+      
+      -- 设置当前行动玩家为一号位（主公）
+      if lord then
+        room:setCurrent(lord)
+      end
+      
+      -- 重置第一次摸牌惩罚标记
+      game_state.first_draw_penalty = false
+      
+      -- 一号位摸4张牌
+      if lord then
+        local draw_data = DrawInitialData:new{ num = 4 }
+        room.logic:trigger(fk.DrawInitialCards, lord, draw_data)
+        draw_data.cards = drawInit(room, lord, 4)
+        room.logic:trigger(fk.AfterDrawInitialCards, lord, draw_data)
+      end
+      
+      -- 二号位摸4张牌
+      if renegade then
+        local draw_data = DrawInitialData:new{ num = 4 }
+        room.logic:trigger(fk.DrawInitialCards, renegade, draw_data)
+        draw_data.cards = drawInit(room, renegade, 4)
+        room.logic:trigger(fk.AfterDrawInitialCards, renegade, draw_data)
+      end
+      
+      -- 触发登场效果
+      room.logic:trigger(U.Debut, player, player.general, false)
       room.logic:trigger(U.Debut, winner, winner.general, false)
     end)
   end,
