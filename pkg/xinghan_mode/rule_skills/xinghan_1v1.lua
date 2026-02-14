@@ -10,13 +10,13 @@ local U = require "packages.xinghan_canlan.pkg.xinghan_mode.xinghan_util"
 
 -- 游戏状态存储
 local game_state = {
-  round_count = 1,           -- 当前局数
-  first_wins = 0,            -- 先手胜局数
-  second_wins = 0,           -- 后手胜局数
-  first_won_count = 0,       -- 先手累计获胜武将数
-  second_won_count = 0,      -- 后手累计获胜武将数
-  first_round_wins = 0,      -- 先手累计小局胜利数
-  second_round_wins = 0,     -- 后手累计小局胜利数
+  round_count = 1,
+  first_wins = 0,
+  second_wins = 0,
+  first_won_count = 0,
+  second_won_count = 0,
+  first_round_wins = 0,
+  second_round_wins = 0,
   shuffle_count = 0,
   peach_as_wine = false,
   hp_damage_active = false,
@@ -85,11 +85,11 @@ end
 -- 根据获胜武将数计算可选武将数量范围
 local function getDeployRange(won_count)
   if won_count == 1 or won_count == 3 then
-    return 2, 2  -- 仅双将
+    return 2, 2
   elseif won_count == 4 then
-    return 1, 1  -- 仅单将
+    return 1, 1
   else
-    return 1, 2  -- 单将或双将
+    return 1, 2
   end
 end
 
@@ -131,7 +131,7 @@ local function drawInit(room, player, n)
   return cardIds
 end
 
--- 选择武将函数（支持限制范围）
+-- 选择武将函数
 local function askForDeploy(room, player, available, min_num, max_num)
   if #available == 0 then return nil end
   
@@ -165,6 +165,35 @@ local function askForDeploy(room, player, available, min_num, max_num)
   end
   
   return chosen
+end
+
+-- 设置武将并添加技能
+local function setGeneralWithSkills(room, player, general, deputy)
+  -- 设置主将
+  room:setPlayerGeneral(player, general, true, true)
+  -- 设置副将
+  if deputy then
+    room:setDeputyGeneral(player, deputy)
+  else
+    player.deputyGeneral = ""
+  end
+  
+  -- 手动添加技能
+  local general_obj = Fk.generals[general]
+  if general_obj then
+    for _, s in ipairs(general_obj:getSkillNameList(false)) do
+      room:handleAddLoseSkills(player, s, nil, false)
+    end
+  end
+  
+  if deputy then
+    local deputy_obj = Fk.generals[deputy]
+    if deputy_obj then
+      for _, s in ipairs(deputy_obj:getSkillNameList(false)) do
+        room:handleAddLoseSkills(player, s, nil, false)
+      end
+    end
+  end
 end
 
 -- 登场效果
@@ -211,17 +240,14 @@ rule:addEffect(fk.GameOverJudge, {
     
     if player.rest > 0 then return end
     
-    -- 判断胜负
-    local winner = player.next  -- 存活的一方
-    local loser = player        -- 死亡的一方
+    local winner = player.next
+    local loser = player
     
-    -- 计算胜方派出的武将数量（主将 + 副将）
     local winner_general_count = 1
     if winner.deputyGeneral and winner.deputyGeneral ~= "" then
       winner_general_count = 2
     end
     
-    -- 更新获胜武将数（根据胜方派出的武将数量）
     if isFirstPlayer(winner) then
       game_state.first_won_count = game_state.first_won_count + winner_general_count
       game_state.first_round_wins = game_state.first_round_wins + 1
@@ -230,13 +256,11 @@ rule:addEffect(fk.GameOverJudge, {
       game_state.second_round_wins = game_state.second_round_wins + 1
     end
     
-    -- 锁定胜方武将
     addLockedGeneral(winner, winner.general)
     if winner.deputyGeneral and winner.deputyGeneral ~= "" then
       addLockedGeneral(winner, winner.deputyGeneral)
     end
     
-    -- 败方武将不锁定，加回到武将池中
     local loser_pool = getGeneralPool(loser)
     table.insert(loser_pool, loser.general)
     if loser.deputyGeneral and loser.deputyGeneral ~= "" then
@@ -248,7 +272,6 @@ rule:addEffect(fk.GameOverJudge, {
       room:setBanner("@&xinghan_second_pool", loser_pool)
     end
     
-    -- 更新显示
     room:setBanner("@xinghan_won", string.format("获胜武将 %d : %d", 
       game_state.first_won_count, game_state.second_won_count))
     room:setBanner("@xinghan_round_wins", string.format("小局胜利 %d : %d",
@@ -268,15 +291,8 @@ rule:addEffect(fk.GameOverJudge, {
       toast = true,
     }
     
-    -- 判断是否赢得本局
-    -- 条件：累计小局胜利数 = 3 且 累计获胜武将数 = 5
-    local first_won_round = game_state.first_round_wins == 3
-    local first_won_generals = game_state.first_won_count == 5
-    local second_won_round = game_state.second_round_wins == 3
-    local second_won_generals = game_state.second_won_count == 5
-    
-    local first_can_win = first_won_round and first_won_generals
-    local second_can_win = second_won_round and second_won_generals
+    local first_can_win = game_state.first_round_wins == 3 and game_state.first_won_count == 5
+    local second_can_win = game_state.second_round_wins == 3 and game_state.second_won_count == 5
     
     if first_can_win then
       game_state.first_wins = game_state.first_wins + 1
@@ -287,13 +303,11 @@ rule:addEffect(fk.GameOverJudge, {
         toast = true,
       }
       
-      -- 判断是否赢得比赛（五局三胜）
       if game_state.first_wins >= 3 then
         room:gameOver("lord")
         return
       end
       
-      -- 重置本局状态，开始新一局
       game_state.round_count = game_state.round_count + 1
       game_state.first_won_count = 0
       game_state.second_won_count = 0
@@ -317,7 +331,6 @@ rule:addEffect(fk.GameOverJudge, {
         return
       end
       
-      -- 重置本局状态
       game_state.round_count = game_state.round_count + 1
       game_state.first_won_count = 0
       game_state.second_won_count = 0
@@ -345,11 +358,9 @@ rule:addEffect(fk.BuryVictim, {
     
     if player.rest > 0 then return end
     
-    -- 获取败方武将池和锁定武将
     local loser_pool = getGeneralPool(player)
     local loser_locked = getLockedGenerals(player)
     
-    -- 过滤掉已锁定的武将
     local loser_available = {}
     for _, g in ipairs(loser_pool) do
       if not table.contains(loser_locked, g) then
@@ -359,12 +370,10 @@ rule:addEffect(fk.BuryVictim, {
     
     player:bury()
     
-    -- 获取胜方信息
     local winner = player.next
     local winner_pool = getGeneralPool(winner)
     local winner_locked = getLockedGenerals(winner)
     
-    -- 过滤掉胜方已锁定的武将
     local winner_available = {}
     for _, g in ipairs(winner_pool) do
       if not table.contains(winner_locked, g) then
@@ -372,7 +381,6 @@ rule:addEffect(fk.BuryVictim, {
       end
     end
     
-    -- 检查是否有人没有可用武将
     if #loser_available == 0 then
       room:gameOver(winner.role)
       return
@@ -399,45 +407,37 @@ rule:addEffect(fk.BuryVictim, {
     end
     
     last_event:addCleaner(function()
-      -- 双方都需要重新选择武将
       room:doBroadcastNotify("ShowToast", Fk:translate("xinghan reorganize"))
       
-      -- 计算双方可选武将数量范围
       local loser_won = getWonCount(player)
       local winner_won = getWonCount(winner)
       local loser_min, loser_max = getDeployRange(loser_won)
       local winner_min, winner_max = getDeployRange(winner_won)
       
-      -- 败方选择武将
       local loser_chosen = askForDeploy(room, player, loser_available, loser_min, loser_max)
       if not loser_chosen or #loser_chosen == 0 then
         loser_chosen = { loser_available[1] }
       end
       
-      -- 从败方武将池移除已选武将
       for _, g in ipairs(loser_chosen) do
         removeGeneral(loser_pool, g)
       end
       
-      -- 更新败方武将池
       if isFirstPlayer(player) then
         room:setBanner("@&xinghan_first_pool", loser_pool)
       else
         room:setBanner("@&xinghan_second_pool", loser_pool)
       end
       
-      -- 胜方选择武将
       local winner_chosen = askForDeploy(room, winner, winner_available, winner_min, winner_max)
       if not winner_chosen or #winner_chosen == 0 then
         winner_chosen = { winner_available[1] }
       end
       
-      -- 从胜方武将池移除已选武将
       for _, g in ipairs(winner_chosen) do
         removeGeneral(winner_pool, g)
       end
       
-      -- 更新胜方武将池
       if isFirstPlayer(winner) then
         room:setBanner("@&xinghan_first_pool", winner_pool)
       else
@@ -445,7 +445,6 @@ rule:addEffect(fk.BuryVictim, {
       end
       
       -- 处理败方复活
-      room:handleAddLoseSkills(player, "-"..table.concat(player:getSkillNameList(), "|-"), nil, false)
       room:resumePlayerArea(target, {
         Player.WeaponSlot,
         Player.ArmorSlot,
@@ -455,11 +454,9 @@ rule:addEffect(fk.BuryVictim, {
         Player.JudgeSlot,
       })
       
-      -- 设置败方武将（使用正确的方式设置双将）
-      room:setPlayerGeneral(player, loser_chosen[1], true, true)
-      if #loser_chosen > 1 then
-        room:setDeputyGeneral(player, loser_chosen[2])
-      end
+      -- 设置败方武将（使用封装函数，会自动添加技能）
+      local loser_deputy = #loser_chosen > 1 and loser_chosen[2] or nil
+      setGeneralWithSkills(room, player, loser_chosen[1], loser_deputy)
       
       room:revivePlayer(player, false)
       
@@ -476,14 +473,9 @@ rule:addEffect(fk.BuryVictim, {
       room.logic:trigger(fk.AfterDrawInitialCards, player, draw_data)
       room.logic:trigger(U.Debut, player, player.general, false)
       
-      -- 处理胜方换将
-      room:handleAddLoseSkills(winner, "-"..table.concat(winner:getSkillNameList(), "|-"), nil, false)
-      
-      -- 设置胜方武将（使用正确的方式设置双将）
-      room:setPlayerGeneral(winner, winner_chosen[1], true, true)
-      if #winner_chosen > 1 then
-        room:setDeputyGeneral(winner, winner_chosen[2])
-      end
+      -- 设置胜方武将（使用封装函数，会自动添加技能）
+      local winner_deputy = #winner_chosen > 1 and winner_chosen[2] or nil
+      setGeneralWithSkills(room, winner, winner_chosen[1], winner_deputy)
       
       local winner_hp = Fk.generals[winner_chosen[1]].hp
       if #winner_chosen > 1 then
