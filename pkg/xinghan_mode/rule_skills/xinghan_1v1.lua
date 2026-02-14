@@ -71,12 +71,20 @@ local function addLockedGeneral(player, general)
   end
 end
 
--- 获取玩家当前小局胜利数
-local function getRoundWins(player)
-  if isFirstPlayer(player) then
-    return game_state.first_round_wins
+-- 根据可选武将数量计算可选范围
+-- 7、5：可选单将或双将 (1-2)
+-- 6、4：仅可选双将 (2)
+-- 3：仅可选单将 (1)
+local function getDeployRange(available_count)
+  if available_count == 7 or available_count == 5 then
+    return 1, 2  -- 可选单将或双将
+  elseif available_count == 6 or available_count == 4 then
+    return 2, 2  -- 仅可选双将
+  elseif available_count == 3 then
+    return 1, 1  -- 仅可选单将
   else
-    return game_state.second_round_wins
+    -- 其他情况（如2、1），根据实际情况
+    return 1, math.min(2, available_count)
   end
 end
 
@@ -353,9 +361,9 @@ rule:addEffect(fk.BuryVictim, {
     last_event:addCleaner(function()
       room:doBroadcastNotify("ShowToast", Fk:translate("xinghan reorganize"))
       
-      -- 双方都可以选择1-2名武将
-      local loser_min, loser_max = 1, 2
-      local winner_min, winner_max = 1, 2
+      -- 根据可选武将数量计算选将范围
+      local loser_min, loser_max = getDeployRange(#loser_available)
+      local winner_min, winner_max = getDeployRange(#winner_available)
       
       local loser_chosen = askForDeploy(room, player, loser_available, loser_min, loser_max)
       if not loser_chosen or #loser_chosen == 0 then
