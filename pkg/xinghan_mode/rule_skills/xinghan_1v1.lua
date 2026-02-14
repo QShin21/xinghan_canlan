@@ -394,6 +394,16 @@ rule:addEffect(fk.BuryVictim, {
         Player.JudgeSlot,
       })
       
+      -- 清理败方原本的所有技能
+      local loser_old_skills = player:getSkillNameList()
+      if #loser_old_skills > 0 then
+        local skills_to_remove = {}
+        for _, skill_name in ipairs(loser_old_skills) do
+          table.insert(skills_to_remove, "-" .. skill_name)
+        end
+        room:handleAddLoseSkills(player, table.concat(skills_to_remove, "|"), nil, false, false)
+      end
+      
       -- 使用 changeHero 设置败方武将
       room:changeHero(player, loser_chosen[1], false, false, false, true, false)
       if #loser_chosen > 1 then
@@ -411,6 +421,16 @@ rule:addEffect(fk.BuryVictim, {
       end
       room:setPlayerProperty(player, "hp", loser_hp)
       room:setPlayerProperty(player, "maxHp", loser_hp)
+      
+      -- 清理胜方原本的所有技能
+      local winner_old_skills = winner:getSkillNameList()
+      if #winner_old_skills > 0 then
+        local skills_to_remove = {}
+        for _, skill_name in ipairs(winner_old_skills) do
+          table.insert(skills_to_remove, "-" .. skill_name)
+        end
+        room:handleAddLoseSkills(winner, table.concat(skills_to_remove, "|"), nil, false, false)
+      end
       
       -- 使用 changeHero 设置胜方武将
       room:changeHero(winner, winner_chosen[1], false, false, false, true, false)
