@@ -321,8 +321,10 @@ rule:addEffect(fk.BuryVictim, {
     
     local current = room.logic:getCurrentEvent()
     local last_event = nil
+    local turn_event = current:findParent(GameEvent.Turn, true)
+    
     if room.current.dead then
-      last_event = current:findParent(GameEvent.Turn, true)
+      last_event = turn_event
     end
     if last_event == nil then
       last_event = current
@@ -332,6 +334,11 @@ rule:addEffect(fk.BuryVictim, {
           last_event = last_event.parent
         until (not last_event.parent)
       end
+    end
+    
+    -- 先结束当前回合（中止一切结算）
+    if turn_event then
+      turn_event:shutdown()
     end
     
     last_event:addCleaner(function()
@@ -460,9 +467,6 @@ rule:addEffect(fk.BuryVictim, {
       -- 触发登场效果
       room.logic:trigger(U.Debut, player, player.general, false)
       room.logic:trigger(U.Debut, winner, winner.general, false)
-      
-      -- 结束当前回合，跳过弃牌阶段等一切结算
-      room.logic:breakTurn()
     end)
   end,
 })
