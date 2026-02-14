@@ -323,32 +323,6 @@ rule:addEffect(fk.BuryVictim, {
     -- 设置重整阶段标记
     game_state.in_reorganize = true
     
-    -- 获取当前回合玩家
-    local current_player = room.current
-    
-    -- 跳过当前玩家剩余的所有阶段
-    if current_player and not current_player.dead then
-      current_player:skip(Player.Start)
-      current_player:skip(Player.Judge)
-      current_player:skip(Player.Draw)
-      current_player:skip(Player.Play)
-      current_player:skip(Player.Discard)
-      current_player:skip(Player.Finish)
-      
-      -- 如果当前是一号位的回合，还需要跳过二号位的所有阶段
-      if isFirstSeat(current_player) then
-        local second = room.players[2]
-        if second then
-          second:skip(Player.Start)
-          second:skip(Player.Judge)
-          second:skip(Player.Draw)
-          second:skip(Player.Play)
-          second:skip(Player.Discard)
-          second:skip(Player.Finish)
-        end
-      end
-    end
-    
     local current = room.logic:getCurrentEvent()
     local last_event = nil
     
@@ -464,14 +438,8 @@ rule:addEffect(fk.BuryVictim, {
       -- 重置第一次摸牌惩罚标记
       game_state.first_draw_penalty = false
       
-      -- 将一号位设为当前行动者
-      local first = room.players[1]
-      if first then
-        room:setCurrent(first)
-      end
-      
       -- 触发登场效果
-      first = room.players[1]
+      local first = room.players[1]
       local second = room.players[2]
       if first and first.general and first.general ~= "" then
         room.logic:trigger(U.Debut, first, first.general, false)
@@ -496,6 +464,37 @@ rule:addEffect(fk.BuryVictim, {
         room.logic:trigger(fk.DrawInitialCards, second, draw_data)
         draw_data.cards = drawInit(room, second, 4)
         room.logic:trigger(fk.AfterDrawInitialCards, second, draw_data)
+      end
+      
+      -- 获取当前回合玩家
+      local current_player = room.current
+      if current_player then
+        -- 定义所有阶段
+        local phases = { Player.Start, Player.Judge, Player.Draw, Player.Play, Player.Discard, Player.Finish }
+        
+        if isFirstSeat(current_player) then
+          -- 当前是一号位的回合
+          -- 判断并跳过所有能跳过的阶段
+          for _, phase in ipairs(phases) do
+            if current_player:canSkip(phase) then
+              current_player:skip(phase)
+            end
+          end
+          -- 获得一个额外回合
+          current_player:gainAnExtraTurn(false, "xinghan_reorganize", nil, nil)
+          -- 结束当前阶段
+          current_player:endCurrentPhase()
+        else
+          -- 当前是二号位的回合
+          -- 判断并跳过所有能跳过的阶段
+          for _, phase in ipairs(phases) do
+            if current_player:canSkip(phase) then
+              current_player:skip(phase)
+            end
+          end
+          -- 结束当前阶段
+          current_player:endCurrentPhase()
+        end
       end
       
       -- 重置重整阶段标记
