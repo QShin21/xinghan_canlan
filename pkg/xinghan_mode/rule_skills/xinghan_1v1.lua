@@ -16,7 +16,6 @@ local game_state = {
   peach_as_wine = false,
   hp_damage_active = false,
   first_draw_penalty = false, -- 一号位第一次摸牌惩罚标记
-  trigger_debut = false,      -- 触发登场效果标记
 }
 
 -- 从武将池中移除武将
@@ -38,7 +37,7 @@ end
 
 -- 判断是否为一号位（用于行动顺序）
 local function isFirstSeat(player)
-  return player.seat == 1
+  return player and player.seat == 1
 end
 
 -- 获取玩家武将池（按身份）
@@ -194,27 +193,6 @@ rule:addEffect(fk.DrawNCards, {
   on_refresh = function(self, event, target, player, data)
     game_state.first_draw_penalty = true
     data.n = data.n - 1
-  end,
-})
-
--- 新的一轮开始时触发登场效果
-rule:addEffect(fk.RoundStart, {
-  can_refresh = function(self, event, target, player, data)
-    return game_state.trigger_debut
-  end,
-  on_refresh = function(self, event, target, player, data)
-    local room = player.room
-    -- 触发登场效果
-    local first = room.players[1]
-    local second = room.players[2]
-    if first and first.general and first.general ~= "" then
-      room.logic:trigger(U.Debut, first, first.general, false)
-    end
-    if second and second.general and second.general ~= "" then
-      room.logic:trigger(U.Debut, second, second.general, false)
-    end
-    -- 重置标记
-    game_state.trigger_debut = false
   end,
 })
 
@@ -480,25 +458,38 @@ rule:addEffect(fk.BuryVictim, {
         room.logic:trigger(fk.AfterDrawInitialCards, second, draw_data)
       end
       
-      -- 设置触发登场效果标记
-      game_state.trigger_debut = true
+      -- 触发登场效果
+      first = room.players[1]
+      second = room.players[2]
+      if first and first.general and first.general ~= "" then
+        room.logic:trigger(U.Debut, first, first.general, false)
+      end
+      if second and second.general and second.general ~= "" then
+        room.logic:trigger(U.Debut, second, second.general, false)
+      end
       
-      -- 检测当前回合信息，结束当前回合
-      local current_turn = room.logic:getCurrentEvent():findParent(GameEvent.Turn, true)
-      if current_turn then
-        local current_player = current_turn.data.player
+      -- 检测当前回合信息，跳过剩余阶段
+      local current_player = room.current
+      if current_player then
+        -- 跳过当前玩家剩余的所有阶段
+        current_player:skip(Player.Start)
+        current_player:skip(Player.Judge)
+        current_player:skip(Player.Draw)
+        current_player:skip(Player.Play)
+        current_player:skip(Player.Discard)
+        current_player:skip(Player.Finish)
+        
         if isFirstSeat(current_player) then
-          -- 当前是一号位的回合：结束一号位的回合，进入二号位的回合开始阶段
-          -- 然后结束二号位的回合，新的一轮开始
-          current_turn:shutdown()
-          -- 等待进入二号位的回合，然后结束
-          local second_turn = room.logic:getCurrentEvent():findParent(GameEvent.Turn, true)
-          if second_turn then
-            second_turn:shutdown()
+          -- 当前是一号位的回合：还需要跳过二号位的所有阶段
+          local second = room.players[2]
+          if second then
+            second:skip(Player.Start)
+            second:skip(Player.Judge)
+            second:skip(Player.Draw)
+            second:skip(Player.Play)
+            second:skip(Player.Discard)
+            second:skip(Player.Finish)
           end
-        else
-          -- 当前是二号位的回合：结束二号位的回合，新的一轮开始
-          current_turn:shutdown()
         end
       end
     end)
