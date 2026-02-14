@@ -203,13 +203,15 @@ rule:addEffect(fk.GameOverJudge, {
     
     if player.rest > 0 then return end
     
-    local winner = player.next  -- 小局获胜方（存活方）
-    local loser = player        -- 小局失败方（死亡方）
+    local winner = player.next  -- 小局获胜方（存活方/击杀方）
+    local loser = player        -- 小局失败方（死亡方/被击杀方）
     
-    -- 更新小局胜利数
-    if isFirstPlayer(winner) then
+    -- 更新被击杀次数（死亡方的次数）
+    if isFirstPlayer(loser) then
+      -- 先手被击杀，先手被击杀次数+1
       game_state.first_round_wins = game_state.first_round_wins + 1
     else
+      -- 后手被击杀，后手被击杀次数+1
       game_state.second_round_wins = game_state.second_round_wins + 1
     end
     
@@ -232,7 +234,7 @@ rule:addEffect(fk.GameOverJudge, {
     end
     
     -- 更新显示
-    room:setBanner("@xinghan_round_wins", string.format("小局胜利 %d : %d",
+    room:setBanner("@xinghan_round_wins", string.format("被击杀次数 %d : %d",
       game_state.first_round_wins, game_state.second_round_wins))
     
     room:sendLog{
@@ -243,8 +245,9 @@ rule:addEffect(fk.GameOverJudge, {
     }
     
     -- 判断是否获得最终胜利
-    -- 条件：小局胜利数达到3
-    if game_state.first_round_wins >= 3 then
+    -- 条件：对方被击杀次数达到3（即自己实现了3次击杀）
+    if game_state.second_round_wins >= 3 then
+      -- 后手被击杀3次，先手获胜
       room:sendLog{
         type = "#XinghanFinalWin",
         arg = "firstPlayer",
@@ -253,7 +256,8 @@ rule:addEffect(fk.GameOverJudge, {
       room:gameOver("lord")
       return
       
-    elseif game_state.second_round_wins >= 3 then
+    elseif game_state.first_round_wins >= 3 then
+      -- 先手被击杀3次，后手获胜
       room:sendLog{
         type = "#XinghanFinalWin",
         arg = "secondPlayer",
