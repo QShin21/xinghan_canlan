@@ -29,11 +29,9 @@ local function removeGeneral(generals, g)
   return table.remove(generals, 1)
 end
 
--- 判断是否为先手玩家
+-- 判断是否为先手玩家（主公）
 local function isFirstPlayer(player)
-  local room = player.room
-  local first = room:getBanner("@xinghan_first_player")
-  return first and first == player.id
+  return player.role == "lord"
 end
 
 -- 获取玩家武将池

@@ -75,28 +75,18 @@ local xinghan_1v1_getLogic = function()
   function xinghan_1v1_logic:chooseGenerals()
     local room = self.room
     
-    -- 随机分配身份：主公为先手，内奸为后手
-    local roles = { "lord", "renegade" }
-    -- 随机打乱身份
-    for i = #roles, 2, -1 do
-      local j = math.random(1, i)
-      roles[i], roles[j] = roles[j], roles[i]
-    end
+    -- 固定身份：一号位为主公（先手），二号位为内奸（后手）
+    local first = room.players[1]   -- 一号位 = 主公 = 先手
+    local second = room.players[2]  -- 二号位 = 内奸 = 后手
     
-    -- 分配身份
-    local first, second  -- first=主公(先手), second=内奸(后手)
-    for i, p in ipairs(room.players) do
-      local role = roles[i]
-      room:setPlayerProperty(p, "role", role)
-      room:setPlayerProperty(p, "role_shown", true)
-      room:broadcastProperty(p, "role")
-      
-      if role == "lord" then
-        first = p  -- 主公为先手
-      else
-        second = p  -- 内奸为后手
-      end
-    end
+    -- 设置身份
+    room:setPlayerProperty(first, "role", "lord")
+    room:setPlayerProperty(first, "role_shown", true)
+    room:broadcastProperty(first, "role")
+    
+    room:setPlayerProperty(second, "role", "renegade")
+    room:setPlayerProperty(second, "role_shown", true)
+    room:broadcastProperty(second, "role")
     
     room:setCurrent(first)
     
