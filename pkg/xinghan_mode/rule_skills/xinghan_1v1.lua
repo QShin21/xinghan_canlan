@@ -30,37 +30,42 @@ local function removeGeneral(generals, g)
   return table.remove(generals, 1)
 end
 
--- 判断是否为先手玩家（一号位）
-local function isFirstPlayer(player)
+-- 判断是否为主公（用于计分和武将池）
+local function isLord(player)
+  return player.role == "lord"
+end
+
+-- 判断是否为一号位（用于行动顺序）
+local function isFirstSeat(player)
   return player.seat == 1
 end
 
--- 获取玩家武将池
+-- 获取玩家武将池（按身份）
 local function getGeneralPool(player)
   local room = player.room
-  if isFirstPlayer(player) then
+  if isLord(player) then
     return room:getBanner("@&xinghan_first_pool") or {}
   else
     return room:getBanner("@&xinghan_second_pool") or {}
   end
 end
 
--- 获取已锁定武将
+-- 获取已锁定武将（按身份）
 local function getLockedGenerals(player)
   local room = player.room
-  if isFirstPlayer(player) then
+  if isLord(player) then
     return room:getBanner("@&xinghan_first_locked") or {}
   else
     return room:getBanner("@&xinghan_second_locked") or {}
   end
 end
 
--- 添加锁定武将
+-- 添加锁定武将（按身份）
 local function addLockedGeneral(player, general)
   local room = player.room
   local locked = getLockedGenerals(player)
   table.insert(locked, general)
-  if isFirstPlayer(player) then
+  if isLord(player) then
     room:setBanner("@&xinghan_first_locked", locked)
   else
     room:setBanner("@&xinghan_second_locked", locked)
@@ -180,10 +185,10 @@ rule:addEffect(fk.DrawInitialCards, {
   end,
 })
 
--- 先手第一回合少摸一张牌
+-- 先手第一回合少摸一张牌（按座位判断）
 rule:addEffect(fk.DrawNCards, {
   can_refresh = function(self, event, target, player, data)
-    return target == player and isFirstPlayer(player) and not game_state.first_draw_penalty
+    return target == player and isFirstSeat(player) and not game_state.first_draw_penalty
   end,
   on_refresh = function(self, event, target, player, data)
     game_state.first_draw_penalty = true
@@ -205,13 +210,15 @@ rule:addEffect(fk.GameOverJudge, {
     local winner = player.next  -- 小局获胜方（存活方/击杀方）
     local loser = player        -- 小局失败方（死亡方/被击杀方）
     
-    -- 更新小局获胜场数（击杀方的次数）
-    if isFirstPlayer(winner) then
-      -- 先手击杀对手，先手小局获胜场数+1
-      game_state.first_round_wins = game_state.first_round_wins + 1
-    else
-      -- 后手击杀对手，后手小局获胜场数+1
+    -- 更新小局获胜场数（按身份计分）
+    -- 主公死亡 → 内奸获得小局胜利
+    -- 内奸死亡 → 主公获得小局胜利
+    if isLord(loser) then
+      -- 主公死亡，内奸获得小局胜利
       game_state.second_round_wins = game_state.second_round_wins + 1
+    else
+      -- 内奸死亡，主公获得小局胜利
+      game_state.first_round_wins = game_state.first_round_wins + 1
     end
     
     -- 锁定小局获胜方的武将
@@ -226,7 +233,7 @@ rule:addEffect(fk.GameOverJudge, {
     if loser.deputyGeneral and loser.deputyGeneral ~= "" then
       table.insert(loser_pool, loser.deputyGeneral)
     end
-    if isFirstPlayer(loser) then
+    if isLord(loser) then
       room:setBanner("@&xinghan_first_pool", loser_pool)
     else
       room:setBanner("@&xinghan_second_pool", loser_pool)
@@ -238,7 +245,7 @@ rule:addEffect(fk.GameOverJudge, {
     
     room:sendLog{
       type = "#XinghanRoundWin",
-      arg = isFirstPlayer(winner) and "firstPlayer" or "secondPlayer",
+      arg = isLord(winner) and "firstPlayer" or "secondPlayer",
       arg2 = string.format("%d : %d", game_state.first_round_wins, game_state.second_round_wins),
       toast = true,
     }
@@ -246,25 +253,23 @@ rule:addEffect(fk.GameOverJudge, {
     -- 判断是否获得最终胜利
     -- 条件：小局获胜场数达到3
     if game_state.first_round_wins >= 3 then
-      -- 一号位小局获胜3场，一号位获胜
-      local first = room.players[1]
+      -- 主公小局获胜3场，主公获胜
       room:sendLog{
         type = "#XinghanFinalWin",
         arg = "firstPlayer",
         toast = true,
       }
-      room:gameOver(first and first.role or "lord")
+      room:gameOver("lord")
       return
       
     elseif game_state.second_round_wins >= 3 then
-      -- 二号位小局获胜3场，二号位获胜
-      local second = room.players[2]
+      -- 内奸小局获胜3场，内奸获胜
       room:sendLog{
         type = "#XinghanFinalWin",
         arg = "secondPlayer",
         toast = true,
       }
-      room:gameOver(second and second.role or "renegade")
+      room:gameOver("renegade")
       return
     end
   end,
@@ -353,7 +358,7 @@ rule:addEffect(fk.BuryVictim, {
         removeGeneral(loser_pool, g)
       end
       
-      if isFirstPlayer(player) then
+      if isLord(player) then
         room:setBanner("@&xinghan_first_pool", loser_pool)
       else
         room:setBanner("@&xinghan_second_pool", loser_pool)
@@ -368,7 +373,7 @@ rule:addEffect(fk.BuryVictim, {
         removeGeneral(winner_pool, g)
       end
       
-      if isFirstPlayer(winner) then
+      if isLord(winner) then
         room:setBanner("@&xinghan_first_pool", winner_pool)
       else
         room:setBanner("@&xinghan_second_pool", winner_pool)
@@ -422,10 +427,10 @@ rule:addEffect(fk.BuryVictim, {
       local p1 = room.players[1]
       local p2 = room.players[2]
       if p1 and p2 then
-        room:swapSeat(p1, p2, false)
+        room:swapSeat(p1, p2, true)  -- arrange_turn=true，更新回合顺序
       end
       
-      -- 设置当前行动玩家为一号位
+      -- 设置当前行动玩家为一号位，开始新的一轮
       local first = room.players[1]
       if first then
         room:setCurrent(first)
