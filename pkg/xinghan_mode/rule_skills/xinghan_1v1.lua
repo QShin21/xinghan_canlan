@@ -16,6 +16,7 @@ local game_state = {
   peach_as_wine = false,
   hp_damage_active = false,
   first_draw_penalty = false, -- 一号位第一次摸牌惩罚标记
+  in_reorganize = false,      -- 是否处于重整阶段
 }
 
 -- 从武将池中移除武将
@@ -319,6 +320,35 @@ rule:addEffect(fk.BuryVictim, {
       return
     end
     
+    -- 设置重整阶段标记
+    game_state.in_reorganize = true
+    
+    -- 获取当前回合玩家
+    local current_player = room.current
+    
+    -- 跳过当前玩家剩余的所有阶段
+    if current_player and not current_player.dead then
+      current_player:skip(Player.Start)
+      current_player:skip(Player.Judge)
+      current_player:skip(Player.Draw)
+      current_player:skip(Player.Play)
+      current_player:skip(Player.Discard)
+      current_player:skip(Player.Finish)
+      
+      -- 如果当前是一号位的回合，还需要跳过二号位的所有阶段
+      if isFirstSeat(current_player) then
+        local second = room.players[2]
+        if second then
+          second:skip(Player.Start)
+          second:skip(Player.Judge)
+          second:skip(Player.Draw)
+          second:skip(Player.Play)
+          second:skip(Player.Discard)
+          second:skip(Player.Finish)
+        end
+      end
+    end
+    
     local current = room.logic:getCurrentEvent()
     local last_event = nil
     
@@ -431,14 +461,24 @@ rule:addEffect(fk.BuryVictim, {
         room:swapSeat(p1, p2, true)  -- arrange_turn=true，更新回合顺序
       end
       
-      -- 设置当前行动玩家为一号位，开始新的一轮
+      -- 重置第一次摸牌惩罚标记
+      game_state.first_draw_penalty = false
+      
+      -- 将一号位设为当前行动者
       local first = room.players[1]
       if first then
         room:setCurrent(first)
       end
       
-      -- 重置第一次摸牌惩罚标记
-      game_state.first_draw_penalty = false
+      -- 触发登场效果
+      first = room.players[1]
+      local second = room.players[2]
+      if first and first.general and first.general ~= "" then
+        room.logic:trigger(U.Debut, first, first.general, false)
+      end
+      if second and second.general and second.general ~= "" then
+        room.logic:trigger(U.Debut, second, second.general, false)
+      end
       
       -- 一号位摸4张牌
       first = room.players[1]
@@ -450,7 +490,7 @@ rule:addEffect(fk.BuryVictim, {
       end
       
       -- 二号位摸4张牌
-      local second = room.players[2]
+      second = room.players[2]
       if second then
         local draw_data = DrawInitialData:new{ num = 4 }
         room.logic:trigger(fk.DrawInitialCards, second, draw_data)
@@ -458,40 +498,8 @@ rule:addEffect(fk.BuryVictim, {
         room.logic:trigger(fk.AfterDrawInitialCards, second, draw_data)
       end
       
-      -- 触发登场效果
-      first = room.players[1]
-      second = room.players[2]
-      if first and first.general and first.general ~= "" then
-        room.logic:trigger(U.Debut, first, first.general, false)
-      end
-      if second and second.general and second.general ~= "" then
-        room.logic:trigger(U.Debut, second, second.general, false)
-      end
-      
-      -- 检测当前回合信息，跳过剩余阶段
-      local current_player = room.current
-      if current_player then
-        -- 跳过当前玩家剩余的所有阶段
-        current_player:skip(Player.Start)
-        current_player:skip(Player.Judge)
-        current_player:skip(Player.Draw)
-        current_player:skip(Player.Play)
-        current_player:skip(Player.Discard)
-        current_player:skip(Player.Finish)
-        
-        if isFirstSeat(current_player) then
-          -- 当前是一号位的回合：还需要跳过二号位的所有阶段
-          local second = room.players[2]
-          if second then
-            second:skip(Player.Start)
-            second:skip(Player.Judge)
-            second:skip(Player.Draw)
-            second:skip(Player.Play)
-            second:skip(Player.Discard)
-            second:skip(Player.Finish)
-          end
-        end
-      end
+      -- 重置重整阶段标记
+      game_state.in_reorganize = false
     end)
   end,
 })
