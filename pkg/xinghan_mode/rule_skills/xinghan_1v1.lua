@@ -16,6 +16,7 @@ local game_state = {
   peach_as_wine = false,
   hp_damage_active = false,
   first_draw_penalty = false, -- 一号位第一次摸牌惩罚标记
+  skip_all_phases = false,    -- 跳过所有阶段标记
 }
 
 -- 从武将池中移除武将
@@ -196,6 +197,36 @@ rule:addEffect(fk.DrawNCards, {
   end,
 })
 
+-- 回合开始时检查是否需要跳过所有阶段
+rule:addEffect(fk.TurnStart, {
+  can_refresh = function(self, event, target, player, data)
+    return target == player and game_state.skip_all_phases
+  end,
+  on_refresh = function(self, event, target, player, data)
+    -- 跳过所有阶段
+    player:skip(Player.Start)
+    player:skip(Player.Judge)
+    player:skip(Player.Draw)
+    player:skip(Player.Play)
+    player:skip(Player.Discard)
+    player:skip(Player.Finish)
+    -- 如果是一号位，还需要跳过二号位的回合
+    if isFirstSeat(player) then
+      local second = player.next
+      if second then
+        second:skip(Player.Start)
+        second:skip(Player.Judge)
+        second:skip(Player.Draw)
+        second:skip(Player.Play)
+        second:skip(Player.Discard)
+        second:skip(Player.Finish)
+      end
+    end
+    -- 重置标记
+    game_state.skip_all_phases = false
+  end,
+})
+
 -- 胜负判定
 rule:addEffect(fk.GameOverJudge, {
   can_refresh = function(self, event, target, player, data)
@@ -321,10 +352,9 @@ rule:addEffect(fk.BuryVictim, {
     
     local current = room.logic:getCurrentEvent()
     local last_event = nil
-    local turn_event = current:findParent(GameEvent.Turn, true)
     
     if room.current.dead then
-      last_event = turn_event
+      last_event = current:findParent(GameEvent.Turn, true)
     end
     if last_event == nil then
       last_event = current
@@ -334,11 +364,6 @@ rule:addEffect(fk.BuryVictim, {
           last_event = last_event.parent
         until (not last_event.parent)
       end
-    end
-    
-    -- 先结束当前回合（中止一切结算）
-    if turn_event then
-      turn_event:shutdown()
     end
     
     last_event:addCleaner(function()
@@ -467,6 +492,9 @@ rule:addEffect(fk.BuryVictim, {
       -- 触发登场效果
       room.logic:trigger(U.Debut, player, player.general, false)
       room.logic:trigger(U.Debut, winner, winner.general, false)
+      
+      -- 设置跳过所有阶段标记，下一回合开始时会跳过所有阶段
+      game_state.skip_all_phases = true
     end)
   end,
 })
