@@ -394,20 +394,32 @@ rule:addEffect(fk.BuryVictim, {
         Player.JudgeSlot,
       })
       
-      -- 清理败方原本的所有技能
-      local loser_old_skills = player:getSkillNameList()
-      if #loser_old_skills > 0 then
-        local skills_to_remove = {}
-        for _, skill_name in ipairs(loser_old_skills) do
-          table.insert(skills_to_remove, "-" .. skill_name)
-        end
-        room:handleAddLoseSkills(player, table.concat(skills_to_remove, "|"), nil, false, false)
+      -- 计算败方新体力值（双将取平均值）
+      local loser_hp = Fk.generals[loser_chosen[1]].hp
+      if #loser_chosen > 1 then
+        loser_hp = math.floor((loser_hp + Fk.generals[loser_chosen[2]].hp) / 2)
       end
       
-      -- 使用 changeHero 设置败方武将
-      room:changeHero(player, loser_chosen[1], false, false, false, true, false)
+      -- 判断败方是否更换了武将（主将或副将）
+      local loser_general_changed = (player.general ~= loser_chosen[1])
+      local loser_deputy_changed = (player.deputyGeneral ~= (loser_chosen[2] or ""))
+      
+      -- 只有在武将改变时才清理技能
+      if loser_general_changed or loser_deputy_changed then
+        local loser_old_skills = player:getSkillNameList()
+        if #loser_old_skills > 0 then
+          local skills_to_remove = {}
+          for _, skill_name in ipairs(loser_old_skills) do
+            table.insert(skills_to_remove, "-" .. skill_name)
+          end
+          room:handleAddLoseSkills(player, table.concat(skills_to_remove, "|"), nil, false, false)
+        end
+      end
+      
+      -- 使用 changeHero 设置败方武将（maxHpChange=false，不自动改变体力上限）
+      room:changeHero(player, loser_chosen[1], false, false, false, false, false)
       if #loser_chosen > 1 then
-        room:changeHero(player, loser_chosen[2], false, true, false, true, false)
+        room:changeHero(player, loser_chosen[2], false, true, false, false, false)
       else
         player.deputyGeneral = ""
         room:broadcastProperty(player, "deputyGeneral")
@@ -415,36 +427,42 @@ rule:addEffect(fk.BuryVictim, {
       
       room:revivePlayer(player, false)
       
-      local loser_hp = Fk.generals[loser_chosen[1]].hp
-      if #loser_chosen > 1 then
-        loser_hp = math.floor((loser_hp + Fk.generals[loser_chosen[2]].hp) / 2)
-      end
+      -- 设置败方体力和体力上限
       room:setPlayerProperty(player, "hp", loser_hp)
       room:setPlayerProperty(player, "maxHp", loser_hp)
       
-      -- 清理胜方原本的所有技能
-      local winner_old_skills = winner:getSkillNameList()
-      if #winner_old_skills > 0 then
-        local skills_to_remove = {}
-        for _, skill_name in ipairs(winner_old_skills) do
-          table.insert(skills_to_remove, "-" .. skill_name)
-        end
-        room:handleAddLoseSkills(winner, table.concat(skills_to_remove, "|"), nil, false, false)
+      -- 计算胜方新体力值（双将取平均值）
+      local winner_hp = Fk.generals[winner_chosen[1]].hp
+      if #winner_chosen > 1 then
+        winner_hp = math.floor((winner_hp + Fk.generals[winner_chosen[2]].hp) / 2)
       end
       
-      -- 使用 changeHero 设置胜方武将
-      room:changeHero(winner, winner_chosen[1], false, false, false, true, false)
+      -- 判断胜方是否更换了武将（主将或副将）
+      local winner_general_changed = (winner.general ~= winner_chosen[1])
+      local winner_deputy_changed = (winner.deputyGeneral ~= (winner_chosen[2] or ""))
+      
+      -- 只有在武将改变时才清理技能
+      if winner_general_changed or winner_deputy_changed then
+        local winner_old_skills = winner:getSkillNameList()
+        if #winner_old_skills > 0 then
+          local skills_to_remove = {}
+          for _, skill_name in ipairs(winner_old_skills) do
+            table.insert(skills_to_remove, "-" .. skill_name)
+          end
+          room:handleAddLoseSkills(winner, table.concat(skills_to_remove, "|"), nil, false, false)
+        end
+      end
+      
+      -- 使用 changeHero 设置胜方武将（maxHpChange=false，不自动改变体力上限）
+      room:changeHero(winner, winner_chosen[1], false, false, false, false, false)
       if #winner_chosen > 1 then
-        room:changeHero(winner, winner_chosen[2], false, true, false, true, false)
+        room:changeHero(winner, winner_chosen[2], false, true, false, false, false)
       else
         winner.deputyGeneral = ""
         room:broadcastProperty(winner, "deputyGeneral")
       end
       
-      local winner_hp = Fk.generals[winner_chosen[1]].hp
-      if #winner_chosen > 1 then
-        winner_hp = math.floor((winner_hp + Fk.generals[winner_chosen[2]].hp) / 2)
-      end
+      -- 设置胜方体力和体力上限
       room:setPlayerProperty(winner, "hp", winner_hp)
       room:setPlayerProperty(winner, "maxHp", winner_hp)
       
