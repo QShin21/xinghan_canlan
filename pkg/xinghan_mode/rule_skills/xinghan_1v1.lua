@@ -10,9 +10,6 @@ local U = require "packages.xinghan_canlan.pkg.xinghan_mode.xinghan_util"
 
 -- 游戏状态存储
 local game_state = {
-  round_count = 1,           -- 当前局数
-  first_wins = 0,            -- 先手最终胜利局数
-  second_wins = 0,           -- 后手最终胜利局数
   first_round_wins = 0,      -- 先手小局胜利数
   second_round_wins = 0,     -- 后手小局胜利数
   shuffle_count = 0,
@@ -248,54 +245,23 @@ rule:addEffect(fk.GameOverJudge, {
     -- 判断是否获得最终胜利
     -- 条件：小局胜利数达到3
     if game_state.first_round_wins >= 3 then
-      game_state.first_wins = game_state.first_wins + 1
       room:sendLog{
-        type = "#XinghanGameWin",
+        type = "#XinghanFinalWin",
         arg = "firstPlayer",
-        arg2 = string.format("%d : %d", game_state.first_wins, game_state.second_wins),
         toast = true,
       }
-      
-      -- 判断是否赢得比赛（五局三胜）
-      if game_state.first_wins >= 3 then
-        room:gameOver("lord")
-        return
-      end
-      
-      -- 重置本局状态，开始新一局
-      game_state.round_count = game_state.round_count + 1
-      game_state.first_round_wins = 0
-      game_state.second_round_wins = 0
-      game_state.shuffle_count = 0
-      game_state.peach_as_wine = false
-      game_state.hp_damage_active = false
+      room:gameOver("lord")
+      return
       
     elseif game_state.second_round_wins >= 3 then
-      game_state.second_wins = game_state.second_wins + 1
       room:sendLog{
-        type = "#XinghanGameWin",
+        type = "#XinghanFinalWin",
         arg = "secondPlayer",
-        arg2 = string.format("%d : %d", game_state.first_wins, game_state.second_wins),
         toast = true,
       }
-      
-      if game_state.second_wins >= 3 then
-        room:gameOver("renegade")
-        return
-      end
-      
-      -- 重置本局状态
-      game_state.round_count = game_state.round_count + 1
-      game_state.first_round_wins = 0
-      game_state.second_round_wins = 0
-      game_state.shuffle_count = 0
-      game_state.peach_as_wine = false
-      game_state.hp_damage_active = false
+      room:gameOver("renegade")
+      return
     end
-    
-    room:setBanner("@xinghan_round", string.format("第 %d 局", game_state.round_count))
-    room:setBanner("@xinghan_score", string.format("%d : %d", 
-      game_state.first_wins, game_state.second_wins))
   end,
 })
 
@@ -527,7 +493,7 @@ Fk:loadTranslationTable{
   ["#XinghanPeachAsWine"] = "鏖战开始：【桃】视为【酒】",
   ["#XinghanAoZhanDamage"] = "鏖战：回合结束，%arg 失去1点体力",
   ["#XinghanRoundWin"] = "%arg 获得小局胜利！当前比分 %arg2",
-  ["#XinghanGameWin"] = "%arg 获得本局胜利！总比分 %arg2",
+  ["#XinghanFinalWin"] = "%arg 获得最终胜利！",
   
   ["#xinghan-deploy"] = "你是[%arg]，可选武将数：%arg2，请选择%arg3-%arg4名武将上场",
   ["xinghan reorganize"] = "重整阶段：双方选择新武将上场",
