@@ -167,32 +167,13 @@ local function askForDeploy(room, player, available, min_num, max_num)
   return chosen
 end
 
--- 设置武将并添加技能
-local function setGeneralWithSkills(room, player, general, deputy)
-  -- 设置主将
-  room:setPlayerGeneral(player, general, true, true)
-  -- 设置副将
+-- 使用 changeHero 设置武将（会自动处理技能）
+local function setHeroWithSkills(room, player, general, deputy)
+  -- 先设置主将
+  room:changeHero(player, general, false, false, false, true, false)
+  -- 如果有副将，设置副将
   if deputy then
-    room:setDeputyGeneral(player, deputy)
-  else
-    player.deputyGeneral = ""
-  end
-  
-  -- 手动添加技能
-  local general_obj = Fk.generals[general]
-  if general_obj then
-    for _, s in ipairs(general_obj:getSkillNameList(false)) do
-      room:handleAddLoseSkills(player, s, nil, false)
-    end
-  end
-  
-  if deputy then
-    local deputy_obj = Fk.generals[deputy]
-    if deputy_obj then
-      for _, s in ipairs(deputy_obj:getSkillNameList(false)) do
-        room:handleAddLoseSkills(player, s, nil, false)
-      end
-    end
+    room:changeHero(player, deputy, false, true, false, true, false)
   end
 end
 
@@ -454,9 +435,9 @@ rule:addEffect(fk.BuryVictim, {
         Player.JudgeSlot,
       })
       
-      -- 设置败方武将（使用封装函数，会自动添加技能）
+      -- 使用 changeHero 设置败方武将（会自动处理技能）
       local loser_deputy = #loser_chosen > 1 and loser_chosen[2] or nil
-      setGeneralWithSkills(room, player, loser_chosen[1], loser_deputy)
+      setHeroWithSkills(room, player, loser_chosen[1], loser_deputy)
       
       room:revivePlayer(player, false)
       
@@ -473,9 +454,9 @@ rule:addEffect(fk.BuryVictim, {
       room.logic:trigger(fk.AfterDrawInitialCards, player, draw_data)
       room.logic:trigger(U.Debut, player, player.general, false)
       
-      -- 设置胜方武将（使用封装函数，会自动添加技能）
+      -- 使用 changeHero 设置胜方武将（会自动处理技能）
       local winner_deputy = #winner_chosen > 1 and winner_chosen[2] or nil
-      setGeneralWithSkills(room, winner, winner_chosen[1], winner_deputy)
+      setHeroWithSkills(room, winner, winner_chosen[1], winner_deputy)
       
       local winner_hp = Fk.generals[winner_chosen[1]].hp
       if #winner_chosen > 1 then
