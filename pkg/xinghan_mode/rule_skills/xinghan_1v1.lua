@@ -137,7 +137,7 @@ local function askForDeploy(room, player, available, min_num, max_num)
     max_num = min_num
   end
   
-  local prompt = "#xinghan-deploy:::"..(isFirstPlayer(player) and "firstPlayer" or "secondPlayer")..":"..#available..":"..min_num..":"..max_num
+  local prompt = "#xinghan-deploy:::"..(isLord(player) and "firstPlayer" or "secondPlayer")..":"..#available..":"..min_num..":"..max_num
   local result = room:askToCustomDialog(player, {
     skill_name = "xinghan_1v1_mode",
     qml_path = "packages/xinghan_canlan/qml/XinghanDeploy.qml",
