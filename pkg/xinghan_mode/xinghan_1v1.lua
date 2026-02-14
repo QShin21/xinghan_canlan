@@ -241,13 +241,13 @@ local xinghan_1v1_getLogic = function()
     -- 设置比分显示
     room:setBanner("@xinghan_score", "0 : 0")
     room:setBanner("@xinghan_round", "第 1 局")
-    room:setBanner("@xinghan_won", "获胜武将 0 : 0")
+    room:setBanner("@xinghan_locked", "锁定武将 0 : 0")
     room:setBanner("@xinghan_round_wins", "小局胜利 0 : 0")
     
-    -- 选择首发武将（获胜武将为0，可选单将或双将）
+    -- 选择首发武将（被锁定武将为0，可选单将或双将）
     room:doBroadcastNotify("ShowToast", Fk:translate("xinghan choose debut"))
     
-    -- 先手选择（获胜武将为0，min=1, max=2）
+    -- 先手选择（被锁定武将为0，min=1, max=2）
     local first_prompt = "#xinghan-deploy:::firstPlayer:"..#first_pool..":1:2"
     local first_result = room:askToCustomDialog(first, {
       skill_name = "xinghan_1v1_mode",
@@ -265,7 +265,7 @@ local xinghan_1v1_getLogic = function()
       table.insert(first_chosen, first_pool[1])
     end
     
-    -- 后手选择（获胜武将为0，min=1, max=2）
+    -- 后手选择（被锁定武将为0，min=1, max=2）
     local second_prompt = "#xinghan-deploy:::secondPlayer:"..#second_pool..":1:2"
     local second_result = room:askToCustomDialog(second, {
       skill_name = "xinghan_1v1_mode",
@@ -349,7 +349,7 @@ Fk:loadTranslationTable{
   
   ["@xinghan_score"] = "比分",
   ["@xinghan_round"] = "局数",
-  ["@xinghan_won"] = "获胜武将数",
+  ["@xinghan_locked"] = "锁定武将数",
   ["@xinghan_round_wins"] = "小局胜利数",
   ["@&xinghan_first_pool"] = "先手武将池",
   ["@&xinghan_second_pool"] = "后手武将池",
@@ -357,9 +357,9 @@ Fk:loadTranslationTable{
   ["@&xinghan_second_locked"] = "后手已锁定",
   
   ["#XinghanScore"] = "比分 先手 %arg : %arg2 后手",
-  ["#XinghanWonCount"] = "获胜武将 先手 %arg : %arg2 后手",
+  ["#XinghanLockedCount"] = "锁定武将 先手 %arg : %arg2 后手",
   ["#XinghanRoundWins"] = "小局胜利 先手 %arg : %arg2 后手",
-  ["#XinghanRoundWin"] = "%arg 赢得本局胜利！当前比分 %arg2",
+  ["#XinghanFinalWin"] = "%arg 获得本局胜利！当前比分 %arg2",
 }
 
 return xinghan_1v1_mode
