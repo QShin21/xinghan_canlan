@@ -30,9 +30,9 @@ local function removeGeneral(generals, g)
   return table.remove(generals, 1)
 end
 
--- 判断是否为先手玩家（主公）
+-- 判断是否为先手玩家（一号位）
 local function isFirstPlayer(player)
-  return player.role == "lord"
+  return player.seat == 1
 end
 
 -- 获取玩家武将池
@@ -246,23 +246,25 @@ rule:addEffect(fk.GameOverJudge, {
     -- 判断是否获得最终胜利
     -- 条件：小局获胜场数达到3
     if game_state.first_round_wins >= 3 then
-      -- 先手小局获胜3场，先手获胜
+      -- 一号位小局获胜3场，一号位获胜
+      local first = room.players[1]
       room:sendLog{
         type = "#XinghanFinalWin",
         arg = "firstPlayer",
         toast = true,
       }
-      room:gameOver("lord")
+      room:gameOver(first and first.role or "lord")
       return
       
     elseif game_state.second_round_wins >= 3 then
-      -- 后手小局获胜3场，后手获胜
+      -- 二号位小局获胜3场，二号位获胜
+      local second = room.players[2]
       room:sendLog{
         type = "#XinghanFinalWin",
         arg = "secondPlayer",
         toast = true,
       }
-      room:gameOver("renegade")
+      room:gameOver(second and second.role or "renegade")
       return
     end
   end,
@@ -416,39 +418,38 @@ rule:addEffect(fk.BuryVictim, {
       room:setPlayerProperty(winner, "hp", winner_hp)
       room:setPlayerProperty(winner, "maxHp", winner_hp)
       
-      -- 交换座位：找到一号位（主公）和二号位（内奸）
-      local lord = nil
-      local renegade = nil
-      for _, p in ipairs(room.players) do
-        if p.role == "lord" then
-          lord = p
-        elseif p.role == "renegade" then
-          renegade = p
-        end
+      -- 交换座位（不改变身份）
+      local p1 = room.players[1]
+      local p2 = room.players[2]
+      if p1 and p2 then
+        room:swapSeat(p1, p2, false)
       end
       
-      -- 设置当前行动玩家为一号位（主公）
-      if lord then
-        room:setCurrent(lord)
+      -- 设置当前行动玩家为一号位
+      local first = room.players[1]
+      if first then
+        room:setCurrent(first)
       end
       
       -- 重置第一次摸牌惩罚标记
       game_state.first_draw_penalty = false
       
       -- 一号位摸4张牌
-      if lord then
+      first = room.players[1]
+      if first then
         local draw_data = DrawInitialData:new{ num = 4 }
-        room.logic:trigger(fk.DrawInitialCards, lord, draw_data)
-        draw_data.cards = drawInit(room, lord, 4)
-        room.logic:trigger(fk.AfterDrawInitialCards, lord, draw_data)
+        room.logic:trigger(fk.DrawInitialCards, first, draw_data)
+        draw_data.cards = drawInit(room, first, 4)
+        room.logic:trigger(fk.AfterDrawInitialCards, first, draw_data)
       end
       
       -- 二号位摸4张牌
-      if renegade then
+      local second = room.players[2]
+      if second then
         local draw_data = DrawInitialData:new{ num = 4 }
-        room.logic:trigger(fk.DrawInitialCards, renegade, draw_data)
-        draw_data.cards = drawInit(room, renegade, 4)
-        room.logic:trigger(fk.AfterDrawInitialCards, renegade, draw_data)
+        room.logic:trigger(fk.DrawInitialCards, second, draw_data)
+        draw_data.cards = drawInit(room, second, 4)
+        room.logic:trigger(fk.AfterDrawInitialCards, second, draw_data)
       end
       
       -- 触发登场效果
