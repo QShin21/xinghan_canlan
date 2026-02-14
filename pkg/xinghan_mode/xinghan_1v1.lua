@@ -239,7 +239,7 @@ local xinghan_1v1_getLogic = function()
     room:setBanner("@&xinghan_second_pool", second_pool)
     
     -- 设置比分显示
-    room:setBanner("@xinghan_round_wins", "被击杀次数 0 : 0")
+    room:setBanner("@xinghan_round_wins", "小局获胜 0 : 0")
     
     -- 选择首发武将（可选单将或双将）
     room:doBroadcastNotify("ShowToast", Fk:translate("xinghan choose debut"))
@@ -350,14 +350,14 @@ Fk:loadTranslationTable{
   
   ["xinghan choose debut"] = "请选择首发武将（可选1-2名）",
   
-  ["@xinghan_round_wins"] = "被击杀次数",
+  ["@xinghan_round_wins"] = "小局获胜",
   ["@&xinghan_first_pool"] = "先手武将池",
   ["@&xinghan_second_pool"] = "后手武将池",
   ["@&xinghan_first_locked"] = "先手已锁定",
   ["@&xinghan_second_locked"] = "后手已锁定",
   
-  ["#XinghanRoundWin"] = "%arg 击杀对手！被击杀次数 %arg2",
-  ["#XinghanFinalWin"] = "%arg 实现三次击杀，获得最终胜利！",
+  ["#XinghanRoundWin"] = "%arg 获得小局胜利！当前比分 %arg2",
+  ["#XinghanFinalWin"] = "%arg 获得三次小局胜利，赢得最终胜利！",
 }
 
 return xinghan_1v1_mode

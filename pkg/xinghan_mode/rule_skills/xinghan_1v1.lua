@@ -10,8 +10,8 @@ local U = require "packages.xinghan_canlan.pkg.xinghan_mode.xinghan_util"
 
 -- 游戏状态存储
 local game_state = {
-  first_round_wins = 0,      -- 先手小局胜利数
-  second_round_wins = 0,     -- 后手小局胜利数
+  first_round_wins = 0,      -- 先手小局获胜场数
+  second_round_wins = 0,     -- 后手小局获胜场数
   shuffle_count = 0,
   peach_as_wine = false,
   hp_damage_active = false,
@@ -206,12 +206,12 @@ rule:addEffect(fk.GameOverJudge, {
     local winner = player.next  -- 小局获胜方（存活方/击杀方）
     local loser = player        -- 小局失败方（死亡方/被击杀方）
     
-    -- 更新被击杀次数（死亡方的次数）
-    if isFirstPlayer(loser) then
-      -- 先手被击杀，先手被击杀次数+1
+    -- 更新小局获胜场数（击杀方的次数）
+    if isFirstPlayer(winner) then
+      -- 先手击杀对手，先手小局获胜场数+1
       game_state.first_round_wins = game_state.first_round_wins + 1
     else
-      -- 后手被击杀，后手被击杀次数+1
+      -- 后手击杀对手，后手小局获胜场数+1
       game_state.second_round_wins = game_state.second_round_wins + 1
     end
     
@@ -234,7 +234,7 @@ rule:addEffect(fk.GameOverJudge, {
     end
     
     -- 更新显示
-    room:setBanner("@xinghan_round_wins", string.format("被击杀次数 %d : %d",
+    room:setBanner("@xinghan_round_wins", string.format("小局获胜 %d : %d",
       game_state.first_round_wins, game_state.second_round_wins))
     
     room:sendLog{
@@ -245,9 +245,9 @@ rule:addEffect(fk.GameOverJudge, {
     }
     
     -- 判断是否获得最终胜利
-    -- 条件：对方被击杀次数达到3（即自己实现了3次击杀）
-    if game_state.second_round_wins >= 3 then
-      -- 后手被击杀3次，先手获胜
+    -- 条件：小局获胜场数达到3
+    if game_state.first_round_wins >= 3 then
+      -- 先手小局获胜3场，先手获胜
       room:sendLog{
         type = "#XinghanFinalWin",
         arg = "firstPlayer",
@@ -256,8 +256,8 @@ rule:addEffect(fk.GameOverJudge, {
       room:gameOver("lord")
       return
       
-    elseif game_state.first_round_wins >= 3 then
-      -- 先手被击杀3次，后手获胜
+    elseif game_state.second_round_wins >= 3 then
+      -- 后手小局获胜3场，后手获胜
       room:sendLog{
         type = "#XinghanFinalWin",
         arg = "secondPlayer",
