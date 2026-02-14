@@ -74,28 +74,31 @@ local xinghan_1v1_getLogic = function()
 
   function xinghan_1v1_logic:chooseGenerals()
     local room = self.room
-    local lord = room.players[1]
-    local nonlord = room.players[2]
     
-    room:setCurrent(lord)
-    
-    -- 比点决定先后手
-    local first, second
-    local lord_point = math.random(1, 6)
-    local nonlord_point = math.random(1, 6)
-    
-    while lord_point == nonlord_point do
-      lord_point = math.random(1, 6)
-      nonlord_point = math.random(1, 6)
+    -- 随机分配身份：主公为先手，内奸为后手
+    local roles = { "lord", "renegade" }
+    -- 随机打乱身份
+    for i = #roles, 2, -1 do
+      local j = math.random(1, i)
+      roles[i], roles[j] = roles[j], roles[i]
     end
     
-    if lord_point > nonlord_point then
-      first = lord
-      second = nonlord
-    else
-      first = nonlord
-      second = lord
+    -- 分配身份
+    local first, second  -- first=主公(先手), second=内奸(后手)
+    for i, p in ipairs(room.players) do
+      local role = roles[i]
+      room:setPlayerProperty(p, "role", role)
+      room:setPlayerProperty(p, "role_shown", true)
+      room:broadcastProperty(p, "role")
+      
+      if role == "lord" then
+        first = p  -- 主公为先手
+      else
+        second = p  -- 内奸为后手
+      end
     end
+    
+    room:setCurrent(first)
     
     -- 保存先手玩家ID到Banner
     room:setBanner("@xinghan_first_player", first.id)
@@ -103,7 +106,7 @@ local xinghan_1v1_getLogic = function()
     
     room:sendLog{
       type = "#XinghanFirstPlayer",
-      arg = first == lord and "firstPlayer" or "secondPlayer",
+      arg = "firstPlayer",
       toast = true,
     }
     
@@ -338,12 +341,12 @@ Fk:loadTranslationTable{
   ["xinghan_1v1_mode"] = "星汉灿烂",
   [":xinghan_1v1_mode"] = desc_xinghan,
   
-  ["#XinghanFirstPlayer"] = "%arg 获得先手权",
+  ["#XinghanFirstPlayer"] = "主公（先手）获得先手权",
   ["#XinghanBanLog"] = "%arg 禁用了 %arg2",
   ["#XinghanChooseLog"] = "%arg 选择了 %arg2",
   
-  ["firstPlayer"] = "先手",
-  ["secondPlayer"] = "后手",
+  ["firstPlayer"] = "主公（先手）",
+  ["secondPlayer"] = "内奸（后手）",
   
   ["#xinghan-ban"] = "你是[%arg]，请禁用 %arg2 名武将",
   ["#xinghan-choose"] = "你是[%arg]，请选择 %arg2 名武将",
@@ -351,10 +354,10 @@ Fk:loadTranslationTable{
   ["xinghan choose debut"] = "请选择首发武将（可选1-2名）",
   
   ["@xinghan_round_wins"] = "小局获胜",
-  ["@&xinghan_first_pool"] = "先手武将池",
-  ["@&xinghan_second_pool"] = "后手武将池",
-  ["@&xinghan_first_locked"] = "先手已锁定",
-  ["@&xinghan_second_locked"] = "后手已锁定",
+  ["@&xinghan_first_pool"] = "主公武将池",
+  ["@&xinghan_second_pool"] = "内奸武将池",
+  ["@&xinghan_first_locked"] = "主公已锁定",
+  ["@&xinghan_second_locked"] = "内奸已锁定",
   
   ["#XinghanRoundWin"] = "%arg 获得小局胜利！当前比分 %arg2",
   ["#XinghanFinalWin"] = "%arg 获得三次小局胜利，赢得最终胜利！",
