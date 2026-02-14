@@ -455,9 +455,11 @@ rule:addEffect(fk.BuryVictim, {
         Player.JudgeSlot,
       })
       
-      -- 使用 changeHero 设置败方武将（会自动处理技能）
-      local loser_deputy = #loser_chosen > 1 and loser_chosen[2] or nil
-      room:changeHero(player, loser_chosen[1], false, false, true, loser_deputy)
+      -- 设置败方武将（使用正确的方式设置双将）
+      room:setPlayerGeneral(player, loser_chosen[1], true, true)
+      if #loser_chosen > 1 then
+        room:setDeputyGeneral(player, loser_chosen[2])
+      end
       
       room:revivePlayer(player, false)
       
@@ -477,9 +479,11 @@ rule:addEffect(fk.BuryVictim, {
       -- 处理胜方换将
       room:handleAddLoseSkills(winner, "-"..table.concat(winner:getSkillNameList(), "|-"), nil, false)
       
-      -- 使用 changeHero 设置胜方武将（会自动处理技能）
-      local winner_deputy = #winner_chosen > 1 and winner_chosen[2] or nil
-      room:changeHero(winner, winner_chosen[1], false, false, true, winner_deputy)
+      -- 设置胜方武将（使用正确的方式设置双将）
+      room:setPlayerGeneral(winner, winner_chosen[1], true, true)
+      if #winner_chosen > 1 then
+        room:setDeputyGeneral(winner, winner_chosen[2])
+      end
       
       local winner_hp = Fk.generals[winner_chosen[1]].hp
       if #winner_chosen > 1 then

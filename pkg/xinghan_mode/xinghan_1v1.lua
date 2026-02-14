@@ -283,18 +283,22 @@ local xinghan_1v1_getLogic = function()
       table.insert(second_chosen, second_pool[1])
     end
     
-    -- 设置先手武将（使用 changeHero 确保技能正确添加）
-    local first_deputy = #first_chosen > 1 and first_chosen[2] or nil
-    room:changeHero(first, first_chosen[1], false, false, true, first_deputy)
+    -- 设置先手武将（使用正确的方式设置双将）
+    room:setPlayerGeneral(first, first_chosen[1], true, true)
+    if #first_chosen > 1 then
+      room:setDeputyGeneral(first, first_chosen[2])
+    end
     
     for _, g in ipairs(first_chosen) do
       removeGeneral(first_pool, g)
     end
     room:setBanner("@&xinghan_first_pool", first_pool)
     
-    -- 设置后手武将（使用 changeHero 确保技能正确添加）
-    local second_deputy = #second_chosen > 1 and second_chosen[2] or nil
-    room:changeHero(second, second_chosen[1], false, false, true, second_deputy)
+    -- 设置后手武将（使用正确的方式设置双将）
+    room:setPlayerGeneral(second, second_chosen[1], true, true)
+    if #second_chosen > 1 then
+      room:setDeputyGeneral(second, second_chosen[2])
+    end
     
     for _, g in ipairs(second_chosen) do
       removeGeneral(second_pool, g)
