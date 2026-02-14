@@ -11,10 +11,8 @@ local U = require "packages.xinghan_canlan.pkg.xinghan_mode.xinghan_util"
 -- 游戏状态存储
 local game_state = {
   round_count = 1,           -- 当前局数
-  first_wins = 0,            -- 先手胜局数（最终胜利局数）
-  second_wins = 0,           -- 后手胜局数
-  first_locked_count = 0,    -- 先手被锁定武将数
-  second_locked_count = 0,   -- 后手被锁定武将数
+  first_wins = 0,            -- 先手最终胜利局数
+  second_wins = 0,           -- 后手最终胜利局数
   first_round_wins = 0,      -- 先手小局胜利数
   second_round_wins = 0,     -- 后手小局胜利数
   shuffle_count = 0,
@@ -73,32 +71,12 @@ local function addLockedGeneral(player, general)
   end
 end
 
--- 获取玩家当前被锁定武将数
-local function getLockedCount(player)
-  if isFirstPlayer(player) then
-    return game_state.first_locked_count
-  else
-    return game_state.second_locked_count
-  end
-end
-
 -- 获取玩家当前小局胜利数
 local function getRoundWins(player)
   if isFirstPlayer(player) then
     return game_state.first_round_wins
   else
     return game_state.second_round_wins
-  end
-end
-
--- 根据被锁定武将数计算可选武将数量范围
-local function getDeployRange(locked_count)
-  if locked_count == 1 or locked_count == 3 then
-    return 2, 2  -- 仅双将
-  elseif locked_count == 4 then
-    return 1, 1  -- 仅单将
-  else
-    return 1, 2  -- 单将或双将
   end
 end
 
@@ -220,14 +198,8 @@ rule:addEffect(fk.GameOverJudge, {
     
     if player.rest > 0 then return end
     
-    local winner = player.next  -- 存活的一方（小局获胜方）
-    local loser = player        -- 死亡的一方（小局失败方）
-    
-    -- 计算小局获胜方使用的武将数量（主将 + 副将）
-    local winner_general_count = 1
-    if winner.deputyGeneral and winner.deputyGeneral ~= "" then
-      winner_general_count = 2
-    end
+    local winner = player.next  -- 小局获胜方（存活方）
+    local loser = player        -- 小局失败方（死亡方）
     
     -- 更新小局胜利数
     if isFirstPlayer(winner) then
@@ -240,13 +212,6 @@ rule:addEffect(fk.GameOverJudge, {
     addLockedGeneral(winner, winner.general)
     if winner.deputyGeneral and winner.deputyGeneral ~= "" then
       addLockedGeneral(winner, winner.deputyGeneral)
-    end
-    
-    -- 更新被锁定武将数
-    if isFirstPlayer(winner) then
-      game_state.first_locked_count = game_state.first_locked_count + winner_general_count
-    else
-      game_state.second_locked_count = game_state.second_locked_count + winner_general_count
     end
     
     -- 小局失败方的武将不锁定，加回到武将池中
@@ -262,34 +227,22 @@ rule:addEffect(fk.GameOverJudge, {
     end
     
     -- 更新显示
-    room:setBanner("@xinghan_locked", string.format("锁定武将 %d : %d", 
-      game_state.first_locked_count, game_state.second_locked_count))
     room:setBanner("@xinghan_round_wins", string.format("小局胜利 %d : %d",
       game_state.first_round_wins, game_state.second_round_wins))
     
     room:sendLog{
-      type = "#XinghanLockedCount",
-      arg = game_state.first_locked_count,
-      arg2 = game_state.second_locked_count,
-      toast = true,
-    }
-    
-    room:sendLog{
-      type = "#XinghanRoundWins",
-      arg = game_state.first_round_wins,
-      arg2 = game_state.second_round_wins,
+      type = "#XinghanRoundWin",
+      arg = isFirstPlayer(winner) and "firstPlayer" or "secondPlayer",
+      arg2 = string.format("%d : %d", game_state.first_round_wins, game_state.second_round_wins),
       toast = true,
     }
     
     -- 判断是否获得最终胜利
-    -- 条件：小局获胜数恰为3 且 被锁定武将数恰为5
-    local first_final_win = game_state.first_round_wins == 3 and game_state.first_locked_count == 5
-    local second_final_win = game_state.second_round_wins == 3 and game_state.second_locked_count == 5
-    
-    if first_final_win then
+    -- 条件：小局胜利数达到3
+    if game_state.first_round_wins >= 3 then
       game_state.first_wins = game_state.first_wins + 1
       room:sendLog{
-        type = "#XinghanFinalWin",
+        type = "#XinghanGameWin",
         arg = "firstPlayer",
         arg2 = string.format("%d : %d", game_state.first_wins, game_state.second_wins),
         toast = true,
@@ -303,18 +256,16 @@ rule:addEffect(fk.GameOverJudge, {
       
       -- 重置本局状态，开始新一局
       game_state.round_count = game_state.round_count + 1
-      game_state.first_locked_count = 0
-      game_state.second_locked_count = 0
       game_state.first_round_wins = 0
       game_state.second_round_wins = 0
       game_state.shuffle_count = 0
       game_state.peach_as_wine = false
       game_state.hp_damage_active = false
       
-    elseif second_final_win then
+    elseif game_state.second_round_wins >= 3 then
       game_state.second_wins = game_state.second_wins + 1
       room:sendLog{
-        type = "#XinghanFinalWin",
+        type = "#XinghanGameWin",
         arg = "secondPlayer",
         arg2 = string.format("%d : %d", game_state.first_wins, game_state.second_wins),
         toast = true,
@@ -327,8 +278,6 @@ rule:addEffect(fk.GameOverJudge, {
       
       -- 重置本局状态
       game_state.round_count = game_state.round_count + 1
-      game_state.first_locked_count = 0
-      game_state.second_locked_count = 0
       game_state.first_round_wins = 0
       game_state.second_round_wins = 0
       game_state.shuffle_count = 0
@@ -404,10 +353,9 @@ rule:addEffect(fk.BuryVictim, {
     last_event:addCleaner(function()
       room:doBroadcastNotify("ShowToast", Fk:translate("xinghan reorganize"))
       
-      local loser_locked_count = getLockedCount(player)
-      local winner_locked_count = getLockedCount(winner)
-      local loser_min, loser_max = getDeployRange(loser_locked_count)
-      local winner_min, winner_max = getDeployRange(winner_locked_count)
+      -- 双方都可以选择1-2名武将
+      local loser_min, loser_max = 1, 2
+      local winner_min, winner_max = 1, 2
       
       local loser_chosen = askForDeploy(room, player, loser_available, loser_min, loser_max)
       if not loser_chosen or #loser_chosen == 0 then
@@ -450,13 +398,10 @@ rule:addEffect(fk.BuryVictim, {
       })
       
       -- 使用 changeHero 设置败方武将
-      -- 先设置主将
       room:changeHero(player, loser_chosen[1], false, false, false, true, false)
-      -- 处理副将：如果有副将则设置，否则清除之前的副将
       if #loser_chosen > 1 then
         room:changeHero(player, loser_chosen[2], false, true, false, true, false)
       else
-        -- 清除之前的副将（设置为空字符串）
         player.deputyGeneral = ""
         room:broadcastProperty(player, "deputyGeneral")
       end
@@ -477,13 +422,10 @@ rule:addEffect(fk.BuryVictim, {
       room.logic:trigger(U.Debut, player, player.general, false)
       
       -- 使用 changeHero 设置胜方武将
-      -- 先设置主将
       room:changeHero(winner, winner_chosen[1], false, false, false, true, false)
-      -- 处理副将：如果有副将则设置，否则清除之前的副将
       if #winner_chosen > 1 then
         room:changeHero(winner, winner_chosen[2], false, true, false, true, false)
       else
-        -- 清除之前的副将（设置为空字符串）
         winner.deputyGeneral = ""
         room:broadcastProperty(winner, "deputyGeneral")
       end
@@ -576,9 +518,8 @@ Fk:loadTranslationTable{
   ["#XinghanShuffle"] = "牌堆已洗牌 %arg 次",
   ["#XinghanPeachAsWine"] = "鏖战开始：【桃】视为【酒】",
   ["#XinghanAoZhanDamage"] = "鏖战：回合结束，%arg 失去1点体力",
-  ["#XinghanRoundWins"] = "小局胜利 先手 %arg : %arg2 后手",
-  ["#XinghanLockedCount"] = "锁定武将 先手 %arg : %arg2 后手",
-  ["#XinghanFinalWin"] = "%arg 获得本局胜利！当前比分 %arg2",
+  ["#XinghanRoundWin"] = "%arg 获得小局胜利！当前比分 %arg2",
+  ["#XinghanGameWin"] = "%arg 获得本局胜利！总比分 %arg2",
   
   ["#xinghan-deploy"] = "你是[%arg]，可选武将数：%arg2，请选择%arg3-%arg4名武将上场",
   ["xinghan reorganize"] = "重整阶段：双方选择新武将上场",
