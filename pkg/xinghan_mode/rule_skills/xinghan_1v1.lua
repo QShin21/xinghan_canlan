@@ -450,10 +450,15 @@ rule:addEffect(fk.BuryVictim, {
       })
       
       -- 使用 changeHero 设置败方武将
-      local loser_deputy = #loser_chosen > 1 and loser_chosen[2] or nil
+      -- 先设置主将
       room:changeHero(player, loser_chosen[1], false, false, false, true, false)
-      if loser_deputy then
-        room:changeHero(player, loser_deputy, false, true, false, true, false)
+      -- 处理副将：如果有副将则设置，否则清除之前的副将
+      if #loser_chosen > 1 then
+        room:changeHero(player, loser_chosen[2], false, true, false, true, false)
+      else
+        -- 清除之前的副将（设置为空字符串）
+        player.deputyGeneral = ""
+        room:broadcastProperty(player, "deputyGeneral")
       end
       
       room:revivePlayer(player, false)
@@ -472,10 +477,15 @@ rule:addEffect(fk.BuryVictim, {
       room.logic:trigger(U.Debut, player, player.general, false)
       
       -- 使用 changeHero 设置胜方武将
-      local winner_deputy = #winner_chosen > 1 and winner_chosen[2] or nil
+      -- 先设置主将
       room:changeHero(winner, winner_chosen[1], false, false, false, true, false)
-      if winner_deputy then
-        room:changeHero(winner, winner_deputy, false, true, false, true, false)
+      -- 处理副将：如果有副将则设置，否则清除之前的副将
+      if #winner_chosen > 1 then
+        room:changeHero(winner, winner_chosen[2], false, true, false, true, false)
+      else
+        -- 清除之前的副将（设置为空字符串）
+        winner.deputyGeneral = ""
+        room:broadcastProperty(winner, "deputyGeneral")
       end
       
       local winner_hp = Fk.generals[winner_chosen[1]].hp
