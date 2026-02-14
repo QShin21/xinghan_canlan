@@ -460,6 +460,9 @@ rule:addEffect(fk.BuryVictim, {
       -- 触发登场效果
       room.logic:trigger(U.Debut, player, player.general, false)
       room.logic:trigger(U.Debut, winner, winner.general, false)
+      
+      -- 结束当前回合，跳过弃牌阶段等一切结算
+      room.logic:breakTurn()
     end)
   end,
 })
