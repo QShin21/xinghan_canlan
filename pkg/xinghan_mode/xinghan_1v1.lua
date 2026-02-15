@@ -312,6 +312,29 @@ local xinghan_1v1_getLogic = function()
   return xinghan_1v1_logic
 end
 
+-- 构建星汉灿烂牌堆
+local function build_xinghan_draw_pile()
+  local draw_pile = {}
+  local void = {}
+  
+  -- 获取星汉灿烂牌堆包中的所有卡牌
+  local xinghan_cards_pkg = Fk.packages["xinghan_cards"]
+  if xinghan_cards_pkg then
+    for _, card in ipairs(xinghan_cards_pkg.cards) do
+      table.insert(draw_pile, card.id)
+    end
+  end
+  
+  -- 将其他所有卡牌放入void区域
+  for _, card in ipairs(Fk.cards) do
+    if card.package and card.package.name ~= "xinghan_cards" then
+      table.insert(void, card.id)
+    end
+  end
+  
+  return draw_pile, void
+end
+
 -- 创建游戏模式
 local xinghan_1v1_mode = fk.CreateGameMode{
   name = "xinghan_1v1_mode",
@@ -319,6 +342,7 @@ local xinghan_1v1_mode = fk.CreateGameMode{
   maxPlayer = 2,
   rule = "#xinghan_1v1_rule&",
   logic = xinghan_1v1_getLogic,
+  build_draw_pile = build_xinghan_draw_pile,
   surrender_func = function(self, playedTime)
     return { 
       { text = "time limitation: 2 min", passed = playedTime >= 120 } 

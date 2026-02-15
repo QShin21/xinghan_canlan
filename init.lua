@@ -14,6 +14,10 @@ extension:addGameMode(require "packages.xinghan_canlan.pkg.xinghan_mode.xinghan_
 Fk:loadTranslationTable{ ["xinghan_canlan"] = "星汉灿烂" }
 Fk:loadTranslationTable(require 'packages.xinghan_canlan.i18n.en_US', 'en_US')
 
+-- 加载牌堆
+local xinghan_cards = require "packages.xinghan_canlan.pkg.xinghan_cards"
+
 return {
   extension,
+  xinghan_cards,
 }
