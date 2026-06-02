@@ -34,7 +34,7 @@ return {
   ["#XinghanWonCount"] = "Generals Won First %arg : %arg2 Second",
   ["#XinghanRoundWins"] = "Round Wins First %arg : %arg2 Second",
   ["#XinghanRoundWin"] = "%arg wins this round! Current score: %arg2",
-  ["#XinghanFinalWin"] = "%arg wins the match!",
+  ["#XinghanFinalWin"] = "%arg wins 3 rounds and has exactly 5 locked generals, winning the match!",
   
   ["#XinghanShuffle"] = "Draw pile shuffled %arg time(s)",
   ["#XinghanPeachAsWine"] = "Ao Zhan begins: [Peach] is treated as [Wine]",

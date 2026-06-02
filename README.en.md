@@ -9,12 +9,24 @@
 - Opens with 18 generals, then bans in this order: second player 1, first player 2, second player 1.
 - Drafts generals in this order: second 1, first 2, second 2, first 2, second 2, first 2, second 2, first receives the final remaining general.
 - Each player builds a 7-general pool.
-- Each round allows 1 or 2 deployed generals.
+- Each round deploys 1 or 2 generals according to the remaining deployable-general state.
 - Winning generals are locked; losing generals return to their owner's pool.
-- First player to win 3 rounds wins the match.
+- A player wins the match only after winning 3 rounds and having exactly 5 locked generals.
 - Dedicated 108-card deck.
 - Ao Zhan rules: after the second deck shuffle, Peach can answer Analeptic/Wine requests; after the third shuffle, the current turn player loses 1 HP at turn end.
 - Selection dialogs use responsive QML layouts with adaptive grid columns.
+
+## Deploy State
+
+The number of generals a player may deploy is determined by how many deployable generals remain:
+
+| Deployable generals left | Deploy limit |
+| --- | --- |
+| 7 or 5 | Single or dual general |
+| 6 or 4 | Dual general only |
+| 3 | Single general only |
+
+This finite-state restriction ensures that a player who wins 3 rounds ends with exactly 5 locked generals.
 
 ## Installation
 

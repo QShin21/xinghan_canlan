@@ -146,6 +146,14 @@ local function addLockedGeneral(player, general)
   end
 end
 
+local function getRoundWins(player, state)
+  return isLord(player) and state.first_round_wins or state.second_round_wins
+end
+
+local function hasFinalWin(player, state)
+  return getRoundWins(player, state) >= 3 and #getLockedGenerals(player) == 5
+end
+
 -- 根据可选武将数量计算可选范围
 -- 7、5：可选单将或双将 (1-2)
 -- 6、4：仅可选双将 (2)
@@ -359,25 +367,14 @@ rule:addEffect(fk.GameOverJudge, {
     }
     
     -- 判断是否获得最终胜利
-    -- 条件：小局获胜场数达到3
-    if state.first_round_wins >= 3 then
-      -- 主公小局获胜3场，主公获胜
+    -- 条件：小局获胜场数达到3，且锁定区恰为5名武将。
+    if hasFinalWin(winner, state) then
       room:sendLog{
         type = "#XinghanFinalWin",
-        arg = "firstPlayer",
+        arg = isLord(winner) and "firstPlayer" or "secondPlayer",
         toast = true,
       }
-      room:gameOver("lord")
-      return
-      
-    elseif state.second_round_wins >= 3 then
-      -- 内奸小局获胜3场，内奸获胜
-      room:sendLog{
-        type = "#XinghanFinalWin",
-        arg = "secondPlayer",
-        toast = true,
-      }
-      room:gameOver("renegade")
+      room:gameOver(winner.role)
       return
     end
   end,
@@ -715,7 +712,7 @@ Fk:loadTranslationTable{
   ["#XinghanPeachAsWine"] = "鏖战开始：【桃】视为【酒】",
   ["#XinghanAoZhanDamage"] = "鏖战：回合结束，%arg 失去1点体力",
   ["#XinghanRoundWin"] = "%arg 获得小局胜利！当前比分 %arg2",
-  ["#XinghanFinalWin"] = "%arg 获得最终胜利！",
+  ["#XinghanFinalWin"] = "%arg 获得3个小局胜利且锁定5名武将，获得最终胜利！",
   
   ["#xinghan-deploy"] = "你是[%arg]，可选武将数：%arg2，请选择%arg3-%arg4名武将上场",
   ["xinghan reorganize"] = "重整阶段：双方选择新武将上场",
