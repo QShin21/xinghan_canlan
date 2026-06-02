@@ -20,31 +20,38 @@ GraphicsBox {
   property var my_selected: []
   property var ur_selected: []
   property bool is_ban: false
+  property int sceneWidth: roomScene && roomScene.width ? roomScene.width : 760
+  property int sceneHeight: roomScene && roomScene.height ? roomScene.height : 520
+  property int cardColumns: Math.max(2, Math.min(6, Math.floor(cardArea.width / 96)))
 
   title.text: Util.processPrompt(prompt)
-  width: 620
-  height: 370
+  width: Math.max(360, Math.min(760, sceneWidth - 48))
+  height: Math.max(360, Math.min(520, sceneHeight - 72))
 
   Flickable {
     id: cardArea
-    height: 280
-    width: 600
     anchors.top: title.bottom
     anchors.topMargin: 10
-    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.leftMargin: 12
+    anchors.rightMargin: 12
+    anchors.bottom: buttonArea.top
+    anchors.bottomMargin: 8
 
+    contentWidth: width
     contentHeight: gridLayout.implicitHeight
-    ScrollBar.horizontal: ScrollBar {}
+    ScrollBar.vertical: ScrollBar {}
     flickableDirection: Flickable.VerticalFlick
     
     clip: true
 
     GridLayout {
       id: gridLayout
-      columns: 6
+      columns: root.cardColumns
       width: parent.width
-      height: parent.height
-      clip: true
+      columnSpacing: 8
+      rowSpacing: 8
 
       Repeater {
         id: generalRepeater
@@ -59,7 +66,7 @@ GraphicsBox {
             if (!selectable || num == 0) return;
 
             if (chosenInBox) {
-              selectedItem.splice(root.selectedItem.indexOf(index), 1);
+              selectedItem.splice(selectedItem.indexOf(index), 1);
               chosenInBox = false;
             } else {
               chosenInBox = true;
@@ -69,6 +76,7 @@ GraphicsBox {
                 selectedItem.splice(0, 1);
               }
             }
+            selectedItem = selectedItem.slice();
             updateSelectable();
           }
 
@@ -88,13 +96,14 @@ GraphicsBox {
     anchors.bottom: parent.bottom
     anchors.bottomMargin: 10
     
-    Row {
+    RowLayout {
       anchors.horizontalCenter: parent.horizontalCenter
+      width: Math.min(parent.width - 24, 360)
       spacing: 15
 
       MetroButton {
         id: buttonConfirm
-        width: 120
+        Layout.preferredWidth: 120
         text: is_ban ? Lua.tr("Ban") : Lua.tr("OK")
         enabled: selectedItem.length == num
 
@@ -109,6 +118,7 @@ GraphicsBox {
 
       MetroButton {
         id: buttonDetail
+        Layout.fillWidth: true
         enabled: selectedItem.length > 0
         text: Lua.tr("Show General Detail")
         onClicked: roomScene.startCheat(

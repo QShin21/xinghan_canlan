@@ -1,13 +1,13 @@
 -- SPDX-License-Identifier: GPL-3.0-or-later
 -- 星汉灿烂 1v1 牌堆配置
--- 共104张牌，基于官方比赛规则设计
+-- 共108张牌，基于官方比赛规则设计
 
 local extension = Package:new("xinghan_cards", Package.CardPack)
 
 -- 这个牌堆不定义新卡牌，只定义卡牌的花色和点数分布
 -- 所有卡牌类型都来自标准牌堆和军争包
 
--- A点数（9张）
+-- A点数（10张）
 extension:addCardSpec("archery_attack", Card.Heart, 1)      -- ♥A 万箭齐发
 extension:addCardSpec("god_salvation", Card.Heart, 1)       -- ♥A 桃园结义
 extension:addCardSpec("nullification", Card.Heart, 1)       -- ♥A 无懈可击
@@ -119,7 +119,7 @@ extension:addCardSpec("slash", Card.Club, 11)               -- ♣J 杀
 extension:addCardSpec("snatch", Card.Spade, 11)             -- ♠J 顺手牵羊
 extension:addCardSpec("iron_chain", Card.Spade, 11)         -- ♠J 铁索连环
 
--- Q点数（8张）
+-- Q点数（10张）
 extension:addCardSpec("dismantlement", Card.Heart, 12)      -- ♥Q 过河拆桥
 extension:addCardSpec("lightning", Card.Heart, 12)          -- ♥Q 闪电
 extension:addCardSpec("peach", Card.Diamond, 12)            -- ♦Q 桃
