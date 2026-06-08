@@ -43,60 +43,16 @@ local desc_xinghan = [[
 
 ]]
 
-local function getGeneralTrueName(g)
-  local general = g and Fk.generals[g]
-  return general and (general.trueName or g) or g
-end
-
-local function appendUniqueGeneral(generals, general, selected)
-  if not general or not Fk.generals[general] then return end
-  local true_name = getGeneralTrueName(general)
-  if selected[true_name] then return end
-  selected[true_name] = true
-  table.insert(generals, general)
-end
-
-local function getDialogGenerals(result, source, min_num, max_num)
-  local chosen = {}
-  local selected = {}
-  max_num = math.min(max_num or #source, #source)
-  min_num = math.min(min_num or max_num, max_num)
-
-  if type(result) == "table" then
-    if type(result.generals) == "table" then
-      for _, general in ipairs(result.generals) do
-        if #chosen >= max_num then break end
-        appendUniqueGeneral(chosen, general, selected)
-      end
-    elseif type(result.ids) == "table" then
-      for _, id in ipairs(result.ids) do
-        if #chosen >= max_num then break end
-        local index = tonumber(id)
-        if index then
-          appendUniqueGeneral(chosen, source[index + 1], selected)
-        end
-      end
-    end
-  end
-
-  for _, general in ipairs(source) do
-    if #chosen >= min_num then break end
-    appendUniqueGeneral(chosen, general, selected)
-  end
-
-  return chosen
-end
-
 -- 从武将池中移除指定武将
 local function removeGeneral(generals, g)
-  if not generals or #generals == 0 or not g then return nil end
-  local gt = getGeneralTrueName(g)
+  if not generals or #generals == 0 then return nil end
+  local gt = Fk.generals[g].trueName
   for i, v in ipairs(generals) do
-    if getGeneralTrueName(v) == gt then
+    if Fk.generals[v].trueName == gt then
       return table.remove(generals, i)
     end
   end
-  return nil
+  return table.remove(generals, 1)
 end
 
 -- 星汉灿烂游戏逻辑
@@ -158,7 +114,20 @@ local xinghan_1v1_getLogic = function()
         }
       })
       
-      local banned = getDialogGenerals(result, all_generals, n, n)
+      local banned = {}
+      if result ~= "" then
+        for i, id in ipairs(result.ids) do
+          local g = result.generals[i]
+          table.insert(banned, g)
+        end
+      else
+        -- 超时默认选择最左侧
+        for i = 1, n do
+          if #all_generals > 0 then
+            table.insert(banned, all_generals[1])
+          end
+        end
+      end
       
       -- 从武将池移除禁用的武将
       for _, g in ipairs(banned) do
@@ -179,7 +148,20 @@ local xinghan_1v1_getLogic = function()
         }
       })
       
-      local chosen = getDialogGenerals(result, all_generals, n, n)
+      local chosen = {}
+      if result ~= "" then
+        for i, id in ipairs(result.ids) do
+          local g = result.generals[i]
+          table.insert(chosen, g)
+        end
+      else
+        -- 超时默认选择最左侧
+        for i = 1, n do
+          if #all_generals > 0 then
+            table.insert(chosen, all_generals[1])
+          end
+        end
+      end
       
       -- 从武将池移除已选武将
       for _, g in ipairs(chosen) do
@@ -248,8 +230,6 @@ local xinghan_1v1_getLogic = function()
     -- 设置武将池显示
     room:setBanner("@&xinghan_first_pool", first_pool)
     room:setBanner("@&xinghan_second_pool", second_pool)
-    room:setBanner("@&xinghan_first_locked", {})
-    room:setBanner("@&xinghan_second_locked", {})
     
     -- 设置比分显示
     room:setBanner("@xinghan_round_wins", "小局获胜 0 : 0")
@@ -265,7 +245,15 @@ local xinghan_1v1_getLogic = function()
       extra_data = { first_pool, 1, 2, {}, first_prompt }
     })
     
-    local first_chosen = getDialogGenerals(first_result, first_pool, 1, 2)
+    local first_chosen = {}
+    if first_result ~= "" then
+      for i, id in ipairs(first_result.ids) do
+        local g = first_result.generals[i]
+        table.insert(first_chosen, g)
+      end
+    else
+      table.insert(first_chosen, first_pool[1])
+    end
     
     -- 后手选择（min=1, max=2）
     local second_prompt = "#xinghan-deploy:::secondPlayer:"..#second_pool..":1:2"
@@ -275,7 +263,15 @@ local xinghan_1v1_getLogic = function()
       extra_data = { second_pool, 1, 2, {}, second_prompt }
     })
     
-    local second_chosen = getDialogGenerals(second_result, second_pool, 1, 2)
+    local second_chosen = {}
+    if second_result ~= "" then
+      for i, id in ipairs(second_result.ids) do
+        local g = second_result.generals[i]
+        table.insert(second_chosen, g)
+      end
+    else
+      table.insert(second_chosen, second_pool[1])
+    end
     
     -- 设置先手武将（使用 changeHero 确保技能正确添加）
     room:changeHero(first, first_chosen[1], false, false, false, true, false)

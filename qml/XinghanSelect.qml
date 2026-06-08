@@ -59,7 +59,7 @@ GraphicsBox {
             if (!selectable || num == 0) return;
 
             if (chosenInBox) {
-              selectedItem.splice(selectedItem.indexOf(index), 1);
+              selectedItem.splice(root.selectedItem.indexOf(index), 1);
               chosenInBox = false;
             } else {
               chosenInBox = true;
@@ -69,7 +69,6 @@ GraphicsBox {
                 selectedItem.splice(0, 1);
               }
             }
-            selectedItem = selectedItem.slice();
             updateSelectable();
           }
 
