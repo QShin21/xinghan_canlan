@@ -19,31 +19,23 @@ GraphicsBox {
   property int maxNum: 2
   property var lockedGenerals: []
   property string prompt: ""
-  property int sceneWidth: roomScene && roomScene.width ? roomScene.width : 760
-  property int sceneHeight: roomScene && roomScene.height ? roomScene.height : 540
-  property int cardColumns: Math.max(2, Math.min(6, Math.floor(cardArea.width / 96)))
 
   title.text: Util.processPrompt(prompt)
-  width: Math.max(360, Math.min(760, sceneWidth - 48))
-  height: Math.max(380, Math.min(540, sceneHeight - 72))
+  width: 620
+  height: 370
 
   // 提示信息区域
   Rectangle {
     id: hintArea
     anchors.top: title.bottom
     anchors.topMargin: 5
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.leftMargin: 12
-    anchors.rightMargin: 12
+    anchors.horizontalCenter: parent.horizontalCenter
+    width: parent.width - 20
     height: 25
     color: "transparent"
     
     Text {
       anchors.centerIn: parent
-      width: parent.width
-      horizontalAlignment: Text.AlignHCenter
-      elide: Text.ElideRight
       text: minNum === maxNum ? 
         Lua.tr("Please select %1 general(s)").arg(minNum) :
         Lua.tr("Please select %1-%2 general(s)").arg(minNum).arg(maxNum)
@@ -55,28 +47,24 @@ GraphicsBox {
 
   Flickable {
     id: cardArea
+    height: 250
+    width: 600
     anchors.top: hintArea.bottom
     anchors.topMargin: 5
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.leftMargin: 12
-    anchors.rightMargin: 12
-    anchors.bottom: infoArea.top
-    anchors.bottomMargin: 5
+    anchors.horizontalCenter: parent.horizontalCenter
 
-    contentWidth: width
     contentHeight: gridLayout.implicitHeight
-    ScrollBar.vertical: ScrollBar {}
+    ScrollBar.horizontal: ScrollBar {}
     flickableDirection: Flickable.VerticalFlick
     
     clip: true
 
     GridLayout {
       id: gridLayout
-      columns: root.cardColumns
+      columns: 6
       width: parent.width
-      columnSpacing: 8
-      rowSpacing: 8
+      height: parent.height
+      clip: true
 
       Repeater {
         id: generalRepeater
@@ -125,12 +113,10 @@ GraphicsBox {
   // 信息显示区域
   Rectangle {
     id: infoArea
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.leftMargin: 12
-    anchors.rightMargin: 12
-    anchors.bottom: buttonArea.top
-    anchors.bottomMargin: 5
+    anchors.top: cardArea.bottom
+    anchors.topMargin: 5
+    anchors.horizontalCenter: parent.horizontalCenter
+    width: parent.width - 20
     height: 20
     color: "transparent"
     
@@ -149,14 +135,13 @@ GraphicsBox {
     anchors.bottom: parent.bottom
     anchors.bottomMargin: 10
     
-    RowLayout {
+    Row {
       anchors.horizontalCenter: parent.horizontalCenter
-      width: Math.min(parent.width - 24, 360)
       spacing: 15
 
       MetroButton {
         id: buttonConfirm
-        Layout.preferredWidth: 120
+        width: 120
         text: Lua.tr("Deploy")
         enabled: selectedItem.length >= minNum && selectedItem.length <= maxNum
 
@@ -171,7 +156,6 @@ GraphicsBox {
 
       MetroButton {
         id: buttonDetail
-        Layout.fillWidth: true
         enabled: selectedItem.length > 0
         text: Lua.tr("Show General Detail")
         onClicked: roomScene.startCheat(

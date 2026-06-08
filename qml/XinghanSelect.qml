@@ -20,38 +20,31 @@ GraphicsBox {
   property var my_selected: []
   property var ur_selected: []
   property bool is_ban: false
-  property int sceneWidth: roomScene && roomScene.width ? roomScene.width : 760
-  property int sceneHeight: roomScene && roomScene.height ? roomScene.height : 520
-  property int cardColumns: Math.max(2, Math.min(6, Math.floor(cardArea.width / 96)))
 
   title.text: Util.processPrompt(prompt)
-  width: Math.max(360, Math.min(760, sceneWidth - 48))
-  height: Math.max(360, Math.min(520, sceneHeight - 72))
+  width: 620
+  height: 370
 
   Flickable {
     id: cardArea
+    height: 280
+    width: 600
     anchors.top: title.bottom
     anchors.topMargin: 10
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.leftMargin: 12
-    anchors.rightMargin: 12
-    anchors.bottom: buttonArea.top
-    anchors.bottomMargin: 8
+    anchors.horizontalCenter: parent.horizontalCenter
 
-    contentWidth: width
     contentHeight: gridLayout.implicitHeight
-    ScrollBar.vertical: ScrollBar {}
+    ScrollBar.horizontal: ScrollBar {}
     flickableDirection: Flickable.VerticalFlick
     
     clip: true
 
     GridLayout {
       id: gridLayout
-      columns: root.cardColumns
+      columns: 6
       width: parent.width
-      columnSpacing: 8
-      rowSpacing: 8
+      height: parent.height
+      clip: true
 
       Repeater {
         id: generalRepeater
@@ -96,14 +89,13 @@ GraphicsBox {
     anchors.bottom: parent.bottom
     anchors.bottomMargin: 10
     
-    RowLayout {
+    Row {
       anchors.horizontalCenter: parent.horizontalCenter
-      width: Math.min(parent.width - 24, 360)
       spacing: 15
 
       MetroButton {
         id: buttonConfirm
-        Layout.preferredWidth: 120
+        width: 120
         text: is_ban ? Lua.tr("Ban") : Lua.tr("OK")
         enabled: selectedItem.length == num
 
@@ -118,7 +110,6 @@ GraphicsBox {
 
       MetroButton {
         id: buttonDetail
-        Layout.fillWidth: true
         enabled: selectedItem.length > 0
         text: Lua.tr("Show General Detail")
         onClicked: roomScene.startCheat(
