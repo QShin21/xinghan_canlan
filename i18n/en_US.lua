@@ -4,8 +4,6 @@
 return {
   ["xinghan_canlan"] = "Xinghan Canlan",
   ["xinghan_1v1_mode"] = "Xinghan Canlan 1v1",
-  ["xinghan_cards"] = "Xinghan Canlan Deck",
-  ["#xinghan_1v1_rule&"] = "Xinghan Canlan Rule",
   
   ["#XinghanFirstPlayer"] = "%arg gets the first move",
   ["#XinghanBanLog"] = "%arg banned %arg2",
@@ -34,7 +32,6 @@ return {
   ["#XinghanWonCount"] = "Generals Won First %arg : %arg2 Second",
   ["#XinghanRoundWins"] = "Round Wins First %arg : %arg2 Second",
   ["#XinghanRoundWin"] = "%arg wins this round! Current score: %arg2",
-  ["#XinghanFinalWin"] = "%arg wins 3 rounds and has exactly 5 locked generals, winning the match!",
   
   ["#XinghanShuffle"] = "Draw pile shuffled %arg time(s)",
   ["#XinghanPeachAsWine"] = "Ao Zhan begins: [Peach] is treated as [Wine]",

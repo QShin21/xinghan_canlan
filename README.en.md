@@ -1,83 +1,36 @@
-# Xinghan Canlan 1v1 Mode
+# xinghan_canlan
 
-`xinghan_canlan` is a FreeKill/New Moon Kill extension for a competitive 1v1 mode. It provides the mode logic, rule skills, QML selection dialogs, English translations, and a dedicated 108-card deck.
+#### Description
+{**When you're done, you can delete the content in this README and update the file with details for others getting started with your repository**}
 
-## Features
+#### Software Architecture
+Software architecture description
 
-- Two-player 1v1 mode.
-- Seat 1 is the lord and first player; seat 2 is the renegade and second player.
-- Opens with 18 generals, then bans in this order: second player 1, first player 2, second player 1.
-- Drafts generals in this order: second 1, first 2, second 2, first 2, second 2, first 2, second 2, first receives the final remaining general.
-- Each player builds a 7-general pool.
-- Each round deploys 1 or 2 generals according to the remaining deployable-general state.
-- Winning generals are locked; losing generals return to their owner's pool.
-- A player wins the match only after winning 3 rounds and having exactly 5 locked generals.
-- Dedicated 108-card deck.
-- Ao Zhan rules: after the second deck shuffle, Peach can answer Analeptic/Wine requests; after the third shuffle, the current turn player loses 1 HP at turn end.
-- Selection dialogs use responsive QML layouts with adaptive grid columns.
+#### Installation
 
-## Deploy State
+1.  xxxx
+2.  xxxx
+3.  xxxx
 
-The number of generals a player may deploy is determined by how many deployable generals remain:
+#### Instructions
 
-| Deployable generals left | Deploy limit |
-| --- | --- |
-| 7 or 5 | Single or dual general |
-| 6 or 4 | Dual general only |
-| 3 | Single general only |
+1.  xxxx
+2.  xxxx
+3.  xxxx
 
-This finite-state restriction ensures that a player who wins 3 rounds ends with exactly 5 locked generals.
+#### Contribution
 
-## Installation
+1.  Fork the repository
+2.  Create Feat_xxx branch
+3.  Commit your code
+4.  Create Pull Request
 
-1. Copy the `xinghan_canlan` directory into the FreeKill `packages` directory.
-2. Restart the client.
-3. Select the "Xinghan Canlan" game mode.
 
-Expected layout:
+#### Gitee Feature
 
-```text
-FreeKill/
-└── packages/
-    └── xinghan_canlan/
-        ├── init.lua
-        ├── pkg/
-        ├── qml/
-        └── i18n/
-```
-
-## Project Layout
-
-```text
-xinghan_canlan/
-├── init.lua
-├── i18n/
-│   └── en_US.lua
-├── pkg/
-│   ├── xinghan_cards/
-│   │   └── init.lua
-│   └── xinghan_mode/
-│       ├── rule_skills/
-│       │   └── xinghan_1v1.lua
-│       ├── xinghan_1v1.lua
-│       └── xinghan_util.lua
-├── qml/
-│   ├── XinghanDeploy.qml
-│   └── XinghanSelect.qml
-├── README.en.md
-└── README.md
-```
-
-## Development Notes
-
-- Mode setup: `pkg/xinghan_mode/xinghan_1v1.lua`
-- Rule skills: `pkg/xinghan_mode/rule_skills/xinghan_1v1.lua`
-- Deck definition: `pkg/xinghan_cards/init.lua`
-- Ban/draft dialog: `qml/XinghanSelect.qml`
-- Deploy dialog: `qml/XinghanDeploy.qml`
-
-This repository does not include the full FreeKill runtime, so local verification is limited to static checks. Full testing should be done in the game client after installing the package.
-
-## License
-
-GPL-3.0-or-later
+1.  You can use Readme\_XXX.md to support different languages, such as Readme\_en.md, Readme\_zh.md
+2.  Gitee blog [blog.gitee.com](https://blog.gitee.com)
+3.  Explore open source project [https://gitee.com/explore](https://gitee.com/explore)
+4.  The most valuable open source project [GVP](https://gitee.com/gvp)
+5.  The manual of Gitee [https://gitee.com/help](https://gitee.com/help)
+6.  The most popular members  [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)

@@ -8,100 +8,27 @@ local rule = fk.CreateSkill {
 
 local U = require "packages.xinghan_canlan.pkg.xinghan_mode.xinghan_util"
 
-local function newGameState()
-  return {
-    first_round_wins = 0,       -- 主公小局获胜场数
-    second_round_wins = 0,      -- 内奸小局获胜场数
-    shuffle_count = 0,
-    peach_as_wine = false,
-    hp_damage_active = false,
-    first_draw_penalty = false, -- 当前小局一号位摸牌惩罚标记
-    in_reorganize = false,      -- 是否处于重整阶段
-  }
-end
-
--- 按房间隔离状态，避免多个房间或连续开局时串场。
-local game_states = setmetatable({}, { __mode = "k" })
-
-local function getGameState(room)
-  if not room then return newGameState() end
-  if not game_states[room] then
-    game_states[room] = newGameState()
-  end
-  return game_states[room]
-end
-
-local function resetGameState(room)
-  local state = newGameState()
-  if room then
-    game_states[room] = state
-  end
-  return state
-end
-
-local function getGeneralTrueName(g)
-  local general = g and Fk.generals[g]
-  return general and (general.trueName or g) or g
-end
-
-local function containsGeneral(generals, general)
-  if not generals or not general then return false end
-  local true_name = getGeneralTrueName(general)
-  for _, g in ipairs(generals) do
-    if getGeneralTrueName(g) == true_name then
-      return true
-    end
-  end
-  return false
-end
-
-local function addGeneral(generals, general)
-  if not generals or not general or not Fk.generals[general] then return end
-  if not containsGeneral(generals, general) then
-    table.insert(generals, general)
-  end
-end
-
-local function getDialogGenerals(result, source, min_num, max_num)
-  local chosen = {}
-  max_num = math.min(max_num or #source, #source)
-  min_num = math.min(min_num or max_num, max_num)
-
-  if type(result) == "table" then
-    if type(result.generals) == "table" then
-      for _, general in ipairs(result.generals) do
-        if #chosen >= max_num then break end
-        addGeneral(chosen, general)
-      end
-    elseif type(result.ids) == "table" then
-      for _, id in ipairs(result.ids) do
-        if #chosen >= max_num then break end
-        local index = tonumber(id)
-        if index then
-          addGeneral(chosen, source[index + 1])
-        end
-      end
-    end
-  end
-
-  for _, general in ipairs(source) do
-    if #chosen >= min_num then break end
-    addGeneral(chosen, general)
-  end
-
-  return chosen
-end
+-- 游戏状态存储
+local game_state = {
+  first_round_wins = 0,      -- 先手小局获胜场数
+  second_round_wins = 0,     -- 后手小局获胜场数
+  shuffle_count = 0,
+  peach_as_wine = false,
+  hp_damage_active = false,
+  first_draw_penalty = false, -- 一号位第一次摸牌惩罚标记
+  in_reorganize = false,      -- 是否处于重整阶段
+}
 
 -- 从武将池中移除武将
 local function removeGeneral(generals, g)
-  if not generals or #generals == 0 or not g then return nil end
-  local gt = getGeneralTrueName(g)
+  if not generals or #generals == 0 then return nil end
+  local gt = Fk.generals[g].trueName
   for i, v in ipairs(generals) do
-    if getGeneralTrueName(v) == gt then
+    if Fk.generals[v].trueName == gt then
       return table.remove(generals, i)
     end
   end
-  return nil
+  return table.remove(generals, 1)
 end
 
 -- 判断是否为主公（用于计分和武将池）
@@ -138,20 +65,12 @@ end
 local function addLockedGeneral(player, general)
   local room = player.room
   local locked = getLockedGenerals(player)
-  addGeneral(locked, general)
+  table.insert(locked, general)
   if isLord(player) then
     room:setBanner("@&xinghan_first_locked", locked)
   else
     room:setBanner("@&xinghan_second_locked", locked)
   end
-end
-
-local function getRoundWins(player, state)
-  return isLord(player) and state.first_round_wins or state.second_round_wins
-end
-
-local function hasFinalWin(player, state)
-  return getRoundWins(player, state) >= 3 and #getLockedGenerals(player) == 5
 end
 
 -- 根据可选武将数量计算可选范围
@@ -209,40 +128,6 @@ local function drawInit(room, player, n)
   return cardIds
 end
 
-local function drawInitialHands(room, players, default_num)
-  local draw_data_map = {}
-  local max_num = 0
-
-  for _, player in ipairs(players) do
-    if player and not player.dead then
-      local draw_data = DrawInitialData:new{ num = default_num }
-      room.logic:trigger(fk.DrawInitialCards, player, draw_data)
-      draw_data.cards = {}
-      draw_data_map[player.id] = draw_data
-      max_num = math.max(max_num, draw_data.num or 0)
-    end
-  end
-
-  for i = 1, max_num do
-    for _, player in ipairs(players) do
-      local draw_data = player and draw_data_map[player.id]
-      if draw_data and i <= (draw_data.num or 0) then
-        local cards = drawInit(room, player, 1)
-        for _, id in ipairs(cards) do
-          table.insert(draw_data.cards, id)
-        end
-      end
-    end
-  end
-
-  for _, player in ipairs(players) do
-    local draw_data = player and draw_data_map[player.id]
-    if draw_data then
-      room.logic:trigger(fk.AfterDrawInitialCards, player, draw_data)
-    end
-  end
-end
-
 -- 选择武将函数
 local function askForDeploy(room, player, available, min_num, max_num)
   if #available == 0 then return nil end
@@ -262,17 +147,21 @@ local function askForDeploy(room, player, available, min_num, max_num)
     }
   })
   
-  return getDialogGenerals(result, available, min_num, max_num)
-end
-
-local function triggerDebutGenerals(room, player)
-  if not room or not player then return end
-  if player.general and player.general ~= "" then
-    room.logic:trigger(U.Debut, player, player.general, false)
+  local chosen = {}
+  if result ~= "" then
+    for i, id in ipairs(result.ids) do
+      local g = result.generals[i]
+      table.insert(chosen, g)
+    end
+  else
+    for i = 1, min_num do
+      if available[i] then
+        table.insert(chosen, available[i])
+      end
+    end
   end
-  if player.deputyGeneral and player.deputyGeneral ~= "" then
-    room.logic:trigger(U.Debut, player, player.deputyGeneral, false)
-  end
+  
+  return chosen
 end
 
 -- 登场效果
@@ -282,9 +171,8 @@ rule:addEffect(fk.GameStart, {
   end,
   on_refresh = function(self, event, target, player, data)
     local room = player.room
-    resetGameState(room)
-    triggerDebutGenerals(room, player)
-    triggerDebutGenerals(room, player.next)
+    room.logic:trigger(U.Debut, player, player.general, false)
+    room.logic:trigger(U.Debut, player.next, player.next.general, false)
   end,
 })
 
@@ -301,13 +189,11 @@ rule:addEffect(fk.DrawInitialCards, {
 -- 先手第一回合少摸一张牌（按座位判断）
 rule:addEffect(fk.DrawNCards, {
   can_refresh = function(self, event, target, player, data)
-    local state = getGameState(player.room)
-    return target == player and isFirstSeat(player) and not state.first_draw_penalty
+    return target == player and isFirstSeat(player) and not game_state.first_draw_penalty
   end,
   on_refresh = function(self, event, target, player, data)
-    local state = getGameState(player.room)
-    state.first_draw_penalty = true
-    data.n = math.max(0, (data.n or 0) - 1)
+    game_state.first_draw_penalty = true
+    data.n = data.n - 1
   end,
 })
 
@@ -318,7 +204,6 @@ rule:addEffect(fk.GameOverJudge, {
   end,
   on_refresh = function(self, event, target, player, data)
     local room = player.room
-    local state = getGameState(room)
     room:setTag("SkipGameRule", true)
     
     if player.rest > 0 then return end
@@ -331,10 +216,10 @@ rule:addEffect(fk.GameOverJudge, {
     -- 内奸死亡 → 主公获得小局胜利
     if isLord(loser) then
       -- 主公死亡，内奸获得小局胜利
-      state.second_round_wins = state.second_round_wins + 1
+      game_state.second_round_wins = game_state.second_round_wins + 1
     else
       -- 内奸死亡，主公获得小局胜利
-      state.first_round_wins = state.first_round_wins + 1
+      game_state.first_round_wins = game_state.first_round_wins + 1
     end
     
     -- 锁定小局获胜方的武将
@@ -345,9 +230,9 @@ rule:addEffect(fk.GameOverJudge, {
     
     -- 小局失败方的武将不锁定，加回到武将池中
     local loser_pool = getGeneralPool(loser)
-    addGeneral(loser_pool, loser.general)
+    table.insert(loser_pool, loser.general)
     if loser.deputyGeneral and loser.deputyGeneral ~= "" then
-      addGeneral(loser_pool, loser.deputyGeneral)
+      table.insert(loser_pool, loser.deputyGeneral)
     end
     if isLord(loser) then
       room:setBanner("@&xinghan_first_pool", loser_pool)
@@ -357,24 +242,35 @@ rule:addEffect(fk.GameOverJudge, {
     
     -- 更新显示
     room:setBanner("@xinghan_round_wins", string.format("小局获胜 %d : %d",
-      state.first_round_wins, state.second_round_wins))
+      game_state.first_round_wins, game_state.second_round_wins))
     
     room:sendLog{
       type = "#XinghanRoundWin",
       arg = isLord(winner) and "firstPlayer" or "secondPlayer",
-      arg2 = string.format("%d : %d", state.first_round_wins, state.second_round_wins),
+      arg2 = string.format("%d : %d", game_state.first_round_wins, game_state.second_round_wins),
       toast = true,
     }
     
     -- 判断是否获得最终胜利
-    -- 条件：小局获胜场数达到3，且锁定区恰为5名武将。
-    if hasFinalWin(winner, state) then
+    -- 条件：小局获胜场数达到3
+    if game_state.first_round_wins >= 3 then
+      -- 主公小局获胜3场，主公获胜
       room:sendLog{
         type = "#XinghanFinalWin",
-        arg = isLord(winner) and "firstPlayer" or "secondPlayer",
+        arg = "firstPlayer",
         toast = true,
       }
-      room:gameOver(winner.role)
+      room:gameOver("lord")
+      return
+      
+    elseif game_state.second_round_wins >= 3 then
+      -- 内奸小局获胜3场，内奸获胜
+      room:sendLog{
+        type = "#XinghanFinalWin",
+        arg = "secondPlayer",
+        toast = true,
+      }
+      room:gameOver("renegade")
       return
     end
   end,
@@ -387,7 +283,6 @@ rule:addEffect(fk.BuryVictim, {
   end,
   on_refresh = function(self, event, target, player, data)
     local room = player.room
-    local state = getGameState(room)
     room:setTag("SkipGameRule", true)
     
     if player.rest > 0 then return end
@@ -397,7 +292,7 @@ rule:addEffect(fk.BuryVictim, {
     
     local loser_available = {}
     for _, g in ipairs(loser_pool) do
-      if not containsGeneral(loser_locked, g) then
+      if not table.contains(loser_locked, g) then
         table.insert(loser_available, g)
       end
     end
@@ -410,7 +305,7 @@ rule:addEffect(fk.BuryVictim, {
     
     local winner_available = {}
     for _, g in ipairs(winner_pool) do
-      if not containsGeneral(winner_locked, g) then
+      if not table.contains(winner_locked, g) then
         table.insert(winner_available, g)
       end
     end
@@ -426,7 +321,7 @@ rule:addEffect(fk.BuryVictim, {
     end
     
     -- 设置重整阶段标记
-    state.in_reorganize = true
+    game_state.in_reorganize = true
     
     local current = room.logic:getCurrentEvent()
     local last_event = nil
@@ -579,14 +474,35 @@ rule:addEffect(fk.BuryVictim, {
       end
       
       -- 重置第一次摸牌惩罚标记
-      state.first_draw_penalty = false
+      game_state.first_draw_penalty = false
       
       -- 触发登场效果
-      triggerDebutGenerals(room, room.players[1])
-      triggerDebutGenerals(room, room.players[2])
+      local first = room.players[1]
+      local second = room.players[2]
+      if first and first.general and first.general ~= "" then
+        room.logic:trigger(U.Debut, first, first.general, false)
+      end
+      if second and second.general and second.general ~= "" then
+        room.logic:trigger(U.Debut, second, second.general, false)
+      end
       
-      -- 双方按座位顺序轮流各摸1张，直到达到起始手牌数。
-      drawInitialHands(room, { room.players[1], room.players[2] }, 4)
+      -- 一号位摸4张牌
+      first = room.players[1]
+      if first then
+        local draw_data = DrawInitialData:new{ num = 4 }
+        room.logic:trigger(fk.DrawInitialCards, first, draw_data)
+        draw_data.cards = drawInit(room, first, 4)
+        room.logic:trigger(fk.AfterDrawInitialCards, first, draw_data)
+      end
+      
+      -- 二号位摸4张牌
+      second = room.players[2]
+      if second then
+        local draw_data = DrawInitialData:new{ num = 4 }
+        room.logic:trigger(fk.DrawInitialCards, second, draw_data)
+        draw_data.cards = drawInit(room, second, 4)
+        room.logic:trigger(fk.AfterDrawInitialCards, second, draw_data)
+      end
       
       -- 获取当前回合玩家
       local current_player = room.current
@@ -620,7 +536,7 @@ rule:addEffect(fk.BuryVictim, {
       end
       
       -- 重置重整阶段标记
-      state.in_reorganize = false
+      game_state.in_reorganize = false
     end)
   end,
 })
@@ -631,50 +547,41 @@ rule:addEffect(fk.AfterDrawPileShuffle, {
     return true
   end,
   on_refresh = function(self, event, target, player, data)
-    local room = player and player.room or target and target.room
-    if not room then return end
-    local state = getGameState(room)
-    state.shuffle_count = state.shuffle_count + 1
+    local room = player.room
+    game_state.shuffle_count = game_state.shuffle_count + 1
     
     room:sendLog{
       type = "#XinghanShuffle",
-      arg = state.shuffle_count,
+      arg = game_state.shuffle_count,
       toast = true,
     }
     
-    if state.shuffle_count == 2 then
-      state.peach_as_wine = true
+    if game_state.shuffle_count == 2 then
+      game_state.peach_as_wine = true
       room:sendLog{
         type = "#XinghanPeachAsWine",
         toast = true,
       }
     end
     
-    if state.shuffle_count >= 3 then
-      state.hp_damage_active = true
+    if game_state.shuffle_count >= 3 then
+      game_state.hp_damage_active = true
     end
   end,
 })
-
-local function isAnalepticPattern(pattern)
-  if not pattern then return false end
-  return string.find(pattern, "analeptic", 1, true) ~= nil
-    or string.find(pattern, "wine", 1, true) ~= nil
-end
 
 -- 鏖战：桃可以作为酒使用
 rule:addEffect(fk.AskForCardUse, {
   mute = true,
   can_trigger = function(self, event, target, player, data)
-    local state = getGameState(player.room)
-    return target == player and state.peach_as_wine and isAnalepticPattern(data.pattern)
+    return target == player and game_state.peach_as_wine and data.pattern
   end,
   on_cost = Util.TrueFunc,
   on_use = function(self, event, target, player, data)
     local room = player.room
     local pattern = data.pattern
     
-    if isAnalepticPattern(pattern) then
+    if pattern and string.find(pattern, "wine") then
       local peaches = table.filter(player:getCardIds(Player.Hand), function(id)
         return Fk:getCardById(id).name == "peach"
       end)
@@ -690,8 +597,7 @@ rule:addEffect(fk.AskForCardUse, {
 -- 鏖战：回合结束扣体力
 rule:addEffect(fk.TurnEnd, {
   can_refresh = function(self, event, target, player, data)
-    local state = getGameState(player.room)
-    return target == player and state.hp_damage_active and not player.dead
+    return game_state.hp_damage_active and not player.dead
   end,
   on_refresh = function(self, event, target, player, data)
     local room = player.room
@@ -712,7 +618,7 @@ Fk:loadTranslationTable{
   ["#XinghanPeachAsWine"] = "鏖战开始：【桃】视为【酒】",
   ["#XinghanAoZhanDamage"] = "鏖战：回合结束，%arg 失去1点体力",
   ["#XinghanRoundWin"] = "%arg 获得小局胜利！当前比分 %arg2",
-  ["#XinghanFinalWin"] = "%arg 获得3个小局胜利且锁定5名武将，获得最终胜利！",
+  ["#XinghanFinalWin"] = "%arg 获得最终胜利！",
   
   ["#xinghan-deploy"] = "你是[%arg]，可选武将数：%arg2，请选择%arg3-%arg4名武将上场",
   ["xinghan reorganize"] = "重整阶段：双方选择新武将上场",
