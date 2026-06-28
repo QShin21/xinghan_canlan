@@ -5,10 +5,12 @@
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
+
 import Fk
-import Fk.Components.LunarLTK
-import Fk.Pages.LunarLTK
 import Fk.Components.Common
+import LunarLtk
+import LunarLtk.Components
+import LunarLtk.Pages.Popups
 
 GraphicsBox {
   id: root
@@ -20,7 +22,7 @@ GraphicsBox {
   property var lockedGenerals: []
   property string prompt: ""
 
-  title.text: Util.processPrompt(prompt)
+  title.text: Ltk.processPrompt(prompt)
   width: 620
   height: 370
 
@@ -71,7 +73,10 @@ GraphicsBox {
         model: generals
 
         delegate: GeneralCardItem {
-          name: modelData
+          required property string modelData
+          required property int index
+
+          dataModel: Ltk.createGeneralCardModel(modelData)
           selectable: !lockedGenerals.includes(modelData)
           chosenInBox: selectedItem.includes(index)
 
@@ -101,10 +106,6 @@ GraphicsBox {
             updateSelectable();
           }
 
-          onRightClicked: {
-            if (Lua.evaluate('ClientInstance:getSettings("enableFreeAssign")'))
-              roomScene.startCheat("FreeAssign", { card: this });
-          }
         }
       }
     }
@@ -147,9 +148,9 @@ GraphicsBox {
 
         onClicked: {
           close();
-          roomScene.state = "notactive";
+          Ltk.roomModel.deActivate();
           ClientInstance.replyToServer("",
-            { ids: selectedItem, generals: selectedItem.map(function(id) { return generalRepeater.itemAt(id).name; }) }
+            { ids: selectedItem, generals: selectedItem.map(function(id) { return generalRepeater.itemAt(id).dataModel.name; }) }
           );
         }
       }
@@ -158,9 +159,9 @@ GraphicsBox {
         id: buttonDetail
         enabled: selectedItem.length > 0
         text: Lua.tr("Show General Detail")
-        onClicked: roomScene.startCheat(
-          "GeneralDetail",
-          { generals: selectedItem.map(function(id) { return generalRepeater.itemAt(id).name; }) }
+        onClicked: roomScene.showInfoPopup(
+          Qt.createComponent("LunarLtk.Pages.InfoPopups", "GeneralDetail"),
+          { generals: selectedItem.map(function(id) { return generalRepeater.itemAt(id).dataModel.name; }) }
         );
       }
     }

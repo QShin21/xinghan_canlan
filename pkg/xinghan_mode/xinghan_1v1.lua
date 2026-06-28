@@ -108,10 +108,17 @@ local xinghan_1v1_getLogic = function()
       local prompt = "#xinghan-ban:::"..(p == first and "firstPlayer" or "secondPlayer")..":"..n
       local result = room:askToCustomDialog(p, {
         skill_name = "xinghan_1v1_mode",
-        qml_path = "packages/xinghan_canlan/qml/XinghanSelect.qml",
-        extra_data = {
-          all_generals, n, {}, {}, prompt, true
-        }
+        component = {
+          url = "packages/xinghan_canlan/qml/XinghanSelect.qml",
+          prop = {
+            generals = all_generals,
+            num = n,
+            my_selected = {},
+            ur_selected = {},
+            prompt = prompt,
+            is_ban = true,
+          },
+        },
       })
       
       local banned = {}
@@ -142,10 +149,17 @@ local xinghan_1v1_getLogic = function()
       local prompt = "#xinghan-choose:::"..(p == first and "firstPlayer" or "secondPlayer")..":"..n
       local result = room:askToCustomDialog(p, {
         skill_name = "xinghan_1v1_mode",
-        qml_path = "packages/xinghan_canlan/qml/XinghanSelect.qml",
-        extra_data = {
-          all_generals, n, {}, {}, prompt, false
-        }
+        component = {
+          url = "packages/xinghan_canlan/qml/XinghanSelect.qml",
+          prop = {
+            generals = all_generals,
+            num = n,
+            my_selected = {},
+            ur_selected = {},
+            prompt = prompt,
+            is_ban = false,
+          },
+        },
       })
       
       local chosen = {}
@@ -241,8 +255,16 @@ local xinghan_1v1_getLogic = function()
     local first_prompt = "#xinghan-deploy:::firstPlayer:"..#first_pool..":1:2"
     local first_result = room:askToCustomDialog(first, {
       skill_name = "xinghan_1v1_mode",
-      qml_path = "packages/xinghan_canlan/qml/XinghanDeploy.qml",
-      extra_data = { first_pool, 1, 2, {}, first_prompt }
+      component = {
+        url = "packages/xinghan_canlan/qml/XinghanDeploy.qml",
+        prop = {
+          generals = first_pool,
+          minNum = 1,
+          maxNum = 2,
+          lockedGenerals = {},
+          prompt = first_prompt,
+        },
+      },
     })
     
     local first_chosen = {}
@@ -259,8 +281,16 @@ local xinghan_1v1_getLogic = function()
     local second_prompt = "#xinghan-deploy:::secondPlayer:"..#second_pool..":1:2"
     local second_result = room:askToCustomDialog(second, {
       skill_name = "xinghan_1v1_mode",
-      qml_path = "packages/xinghan_canlan/qml/XinghanDeploy.qml",
-      extra_data = { second_pool, 1, 2, {}, second_prompt }
+      component = {
+        url = "packages/xinghan_canlan/qml/XinghanDeploy.qml",
+        prop = {
+          generals = second_pool,
+          minNum = 1,
+          maxNum = 2,
+          lockedGenerals = {},
+          prompt = second_prompt,
+        },
+      },
     })
     
     local second_chosen = {}
