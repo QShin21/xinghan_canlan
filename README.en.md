@@ -1,6 +1,6 @@
 # Xinghan Canlan 1v1 Mode
 
-`xinghan_canlan` is a FreeKill/New Moon Kill extension for a competitive 1v1 mode. It provides the mode logic, rule skills, QML selection dialogs, English translations, and a dedicated 108-card deck.
+`xinghan_canlan` is a FreeKill/New Moon Kill extension for a competitive 1v1 mode. It provides the mode logic, rule skills, QML selection dialogs, English translations, a dedicated 108-card deck, and the merged Xinghan general packs.
 
 ## Features
 
@@ -13,6 +13,7 @@
 - Winning generals are locked; losing generals return to their owner's pool.
 - A player wins the match only after winning 3 rounds and having exactly 5 locked generals.
 - Dedicated 108-card deck.
+- Merged Xinghan general packs, including general images and skill/death audio.
 - Ao Zhan rules: after the second deck shuffle, Peach can answer Analeptic/Wine requests; after the third shuffle, the current turn player loses 1 HP at turn end.
 - Selection dialogs use responsive QML layouts with adaptive grid columns.
 
@@ -73,6 +74,7 @@ xinghan_canlan/
 - Mode setup: `pkg/xinghan_mode/xinghan_1v1.lua`
 - Rule skills: `pkg/xinghan_mode/rule_skills/xinghan_1v1.lua`
 - Deck definition: `pkg/xinghan_cards/init.lua`
+- General packs: `pkg/lizhan/init.lua` and `pkg/yiwu/init.lua`
 - Ban/draft dialog: `qml/XinghanSelect.qml`
 - Deploy dialog: `qml/XinghanDeploy.qml`
 
